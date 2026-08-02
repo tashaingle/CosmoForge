@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { Stars, Line } from "@react-three/drei";
 import * as THREE from "three";
 
-/** Seeded PRNG for stable particle fields */
 function mulberry32(a: number) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -15,19 +13,37 @@ function mulberry32(a: number) {
   };
 }
 
-/**
- * Annular / spherical particle cloud (asteroid belt, Kuiper, dust).
- */
+function makeRingPositions(
+  count: number,
+  rMin: number,
+  rMax: number,
+  ySpread: number,
+  seed: number
+) {
+  const rand = mulberry32(seed);
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const u = rand();
+    const r = rMin + (rMax - rMin) * Math.pow(u, 0.85);
+    const theta = rand() * Math.PI * 2;
+    const y = (rand() - 0.5) * 2 * ySpread;
+    pos[i * 3] = r * Math.cos(theta);
+    pos[i * 3 + 1] = y;
+    pos[i * 3 + 2] = r * Math.sin(theta);
+  }
+  return pos;
+}
+
+/** Point cloud with real BufferGeometry (R3F-safe) */
 export function ParticleCloud({
   count,
   rMin,
   rMax,
-  ySpread = 0.04,
-  size = 0.012,
-  color = "#c4b5a0",
-  opacity = 0.55,
+  ySpread = 0.08,
+  size = 0.04,
+  color = "#e7d3b0",
+  opacity = 0.85,
   seed = 1,
-  twinkle = false,
 }: {
   count: number;
   rMin: number;
@@ -37,35 +53,16 @@ export function ParticleCloud({
   color?: string;
   opacity?: number;
   seed?: number;
-  twinkle?: boolean;
 }) {
-  const ref = useRef<THREE.Points>(null);
-  const positions = useMemo(() => {
-    const rand = mulberry32(seed);
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const u = rand();
-      const r = Math.sqrt(rMin * rMin + u * (rMax * rMax - rMin * rMin));
-      const theta = rand() * Math.PI * 2;
-      const y = (rand() - 0.5) * 2 * ySpread * r;
-      pos[i * 3] = r * Math.cos(theta);
-      pos[i * 3 + 1] = y;
-      pos[i * 3 + 2] = r * Math.sin(theta);
-    }
-    return pos;
+  const geometry = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    const positions = makeRingPositions(count, rMin, rMax, ySpread, seed);
+    g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    return g;
   }, [count, rMin, rMax, ySpread, seed]);
 
-  useFrame(({ clock }) => {
-    if (!twinkle || !ref.current) return;
-    const mat = ref.current.material as THREE.PointsMaterial;
-    mat.opacity = opacity * (0.75 + 0.25 * Math.sin(clock.elapsedTime * 0.4));
-  });
-
   return (
-    <points ref={ref} frustumCulled={false}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
+    <points geometry={geometry} frustumCulled={false}>
       <pointsMaterial
         size={size}
         color={color}
@@ -79,15 +76,64 @@ export function ParticleCloud({
   );
 }
 
-/** Soft ecliptic dust disc */
+/** Visible rocky bodies in the main belt */
+export function AsteroidRocks({
+  count = 1200,
+  rMin = 2.05,
+  rMax = 3.35,
+  seed = 99,
+}: {
+  count?: number;
+  rMin?: number;
+  rMax?: number;
+  seed?: number;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const rand = mulberry32(seed);
+    for (let i = 0; i < count; i++) {
+      const r = rMin + rand() * (rMax - rMin);
+      const theta = rand() * Math.PI * 2;
+      const y = (rand() - 0.5) * 0.14;
+      dummy.position.set(r * Math.cos(theta), y, r * Math.sin(theta));
+      const s = 0.014 + rand() * 0.032;
+      dummy.scale.set(s, s * (0.55 + rand() * 0.9), s * (0.45 + rand()));
+      dummy.rotation.set(rand() * 6, rand() * 6, rand() * 6);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [count, rMin, rMax, seed, dummy]);
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, count]}
+      frustumCulled={false}
+    >
+      <dodecahedronGeometry args={[1, 0]} />
+      <meshStandardMaterial
+        color="#b5a99a"
+        roughness={0.92}
+        metalness={0.12}
+        flatShading
+      />
+    </instancedMesh>
+  );
+}
+
 export function EclipticDust() {
   return (
     <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={-1}>
-      <ringGeometry args={[0.35, 12, 96]} />
+      <ringGeometry args={[0.5, 14, 128]} />
       <meshBasicMaterial
-        color="#8b9cb3"
+        color="#9fb4d0"
         transparent
-        opacity={0.035}
+        opacity={0.07}
         side={THREE.DoubleSide}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
@@ -96,39 +142,35 @@ export function EclipticDust() {
   );
 }
 
-/** Milky Way-ish band of dense stars */
 export function MilkyWayBand() {
-  const positions = useMemo(() => {
+  const geometry = useMemo(() => {
     const rand = mulberry32(42);
-    const n = 4000;
+    const n = 7000;
     const pos = new Float32Array(n * 3);
-    const R = 55;
+    const R = 60;
     for (let i = 0; i < n; i++) {
       const lon = rand() * Math.PI * 2;
-      // band around a tilted great circle
-      const lat = (rand() - 0.5) * 0.35;
+      const lat = (rand() - 0.5) * 0.55;
       const x = R * Math.cos(lat) * Math.cos(lon);
-      const y = R * Math.sin(lat) + R * 0.15 * Math.sin(lon * 2);
+      const y = R * Math.sin(lat) + R * 0.12 * Math.sin(lon * 2);
       const z = R * Math.cos(lat) * Math.sin(lon);
-      // tilt
-      const tilt = 0.45;
+      const tilt = 0.5;
       pos[i * 3] = x;
       pos[i * 3 + 1] = y * Math.cos(tilt) - z * Math.sin(tilt);
       pos[i * 3 + 2] = y * Math.sin(tilt) + z * Math.cos(tilt);
     }
-    return pos;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return g;
   }, []);
 
   return (
-    <points frustumCulled={false}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
+    <points geometry={geometry} frustumCulled={false}>
       <pointsMaterial
-        size={0.09}
-        color="#dbeafe"
+        size={0.16}
+        color="#e0f2fe"
         transparent
-        opacity={0.45}
+        opacity={0.7}
         sizeAttenuation
         depthWrite={false}
         blending={THREE.AdditiveBlending}
@@ -141,22 +183,22 @@ export function DeepStarfield() {
   return (
     <>
       <Stars
-        radius={90}
-        depth={60}
-        count={8000}
-        factor={3.5}
-        saturation={0.15}
+        radius={100}
+        depth={70}
+        count={12000}
+        factor={4.5}
+        saturation={0.25}
         fade
-        speed={0.15}
+        speed={0.12}
       />
       <Stars
-        radius={70}
-        depth={40}
-        count={2500}
-        factor={5}
-        saturation={0.4}
+        radius={80}
+        depth={45}
+        count={4000}
+        factor={6}
+        saturation={0.5}
         fade
-        speed={0.05}
+        speed={0.04}
       />
       <MilkyWayBand />
     </>
@@ -166,39 +208,38 @@ export function DeepStarfield() {
 export function SunGlow() {
   return (
     <group>
-      {/* Photosphere handled by body mesh; add corona layers */}
       <mesh>
-        <sphereGeometry args={[0.18, 32, 32]} />
+        <sphereGeometry args={[0.22, 32, 32]} />
         <meshBasicMaterial
           color="#ffcc66"
           transparent
-          opacity={0.25}
+          opacity={0.4}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
       <mesh>
-        <sphereGeometry args={[0.32, 32, 32]} />
+        <sphereGeometry args={[0.42, 32, 32]} />
         <meshBasicMaterial
           color="#ff9944"
           transparent
-          opacity={0.08}
+          opacity={0.14}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
       <mesh>
-        <sphereGeometry args={[0.55, 24, 24]} />
+        <sphereGeometry args={[0.75, 24, 24]} />
         <meshBasicMaterial
           color="#ff6600"
           transparent
-          opacity={0.035}
+          opacity={0.06}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
-      <pointLight color="#ffd27a" intensity={3.2} distance={100} decay={0.35} />
-      <pointLight color="#fff5e0" intensity={0.6} distance={40} decay={0.5} />
+      <pointLight color="#ffd27a" intensity={4.2} distance={120} decay={0.3} />
+      <pointLight color="#fff8e7" intensity={1.1} distance={50} decay={0.45} />
     </group>
   );
 }
@@ -206,7 +247,7 @@ export function SunGlow() {
 export function AtmosphereShell({
   radius,
   color,
-  intensity = 0.35,
+  intensity = 0.4,
 }: {
   radius: number;
   color: string;
@@ -214,7 +255,7 @@ export function AtmosphereShell({
 }) {
   return (
     <mesh>
-      <sphereGeometry args={[radius * 1.18, 32, 32]} />
+      <sphereGeometry args={[radius * 1.22, 32, 32]} />
       <meshBasicMaterial
         color={color}
         transparent
@@ -227,18 +268,45 @@ export function AtmosphereShell({
   );
 }
 
-/** Soft planetary limb glow for gas giants */
-export function GasGiantSheen({ radius, color }: { radius: number; color: string }) {
+export function GasGiantSheen({
+  radius,
+  color,
+}: {
+  radius: number;
+  color: string;
+}) {
   return (
     <mesh>
-      <sphereGeometry args={[radius * 1.06, 32, 32]} />
+      <sphereGeometry args={[radius * 1.08, 32, 32]} />
       <meshBasicMaterial
         color={color}
         transparent
-        opacity={0.2}
+        opacity={0.3}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
     </mesh>
+  );
+}
+
+/** Gold guide ring through the middle of the main belt */
+export function BeltGuideRing() {
+  const points = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    const r = 2.7;
+    for (let i = 0; i <= 160; i++) {
+      const t = (i / 160) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(t) * r, 0.03, Math.sin(t) * r));
+    }
+    return pts;
+  }, []);
+  return (
+    <Line
+      points={points}
+      color="#fbbf24"
+      lineWidth={2}
+      transparent
+      opacity={0.55}
+    />
   );
 }

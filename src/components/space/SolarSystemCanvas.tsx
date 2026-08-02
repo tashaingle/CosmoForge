@@ -26,17 +26,18 @@ export function SolarSystemCanvas({
   otherCrafts,
   className,
 }: Props) {
+  // Camera starts looking across Mars–asteroid belt–Jupiter (not tucked at Earth)
   return (
     <div className={className ?? "h-full w-full"}>
       <Canvas
-        camera={{ position: [0, 2.8, 5.2], fov: 48, near: 0.01, far: 200 }}
+        camera={{ position: [1.2, 3.5, 6.5], fov: 50, near: 0.01, far: 200 }}
         dpr={[1, 1.75]}
         gl={{
           antialias: true,
           alpha: false,
           powerPreference: "high-performance",
-          toneMapping: 4, // ACESFilmic
-          toneMappingExposure: 1.05,
+          toneMapping: 4,
+          toneMappingExposure: 1.1,
         }}
       >
         <Suspense fallback={null}>

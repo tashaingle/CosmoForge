@@ -9,7 +9,9 @@ import { craftScenePosition, type OrbitElements } from "@/lib/orbital";
 import type { LiveCraftMarker } from "@/lib/types";
 import { getSkin } from "@/lib/cosmetics";
 import {
+  AsteroidRocks,
   AtmosphereShell,
+  BeltGuideRing,
   DeepStarfield,
   EclipticDust,
   GasGiantSheen,
@@ -374,61 +376,52 @@ export function SolarSystemScene({
       <DeepStarfield />
       <EclipticDust />
 
-      {/* Main asteroid belt ~2.1–3.3 AU */}
+      {/* ASTEROID BELT — deliberately bold so you notice it */}
       <ParticleCloud
-        count={2800}
-        rMin={2.05}
-        rMax={3.35}
-        ySpread={0.035}
-        size={0.014}
-        color="#d6c4a8"
-        opacity={0.55}
+        count={5000}
+        rMin={2.0}
+        rMax={3.4}
+        ySpread={0.1}
+        size={0.045}
+        color="#f5e6c8"
+        opacity={0.9}
         seed={11}
       />
-      {/* Inner belt / Hungarias hint */}
+      <AsteroidRocks count={1200} rMin={2.05} rMax={3.35} seed={99} />
+      <BeltGuideRing />
+
+      {/* Inner dust */}
       <ParticleCloud
-        count={600}
-        rMin={1.85}
-        rMax={2.1}
-        ySpread={0.02}
-        size={0.01}
-        color="#a8a29e"
+        count={1200}
+        rMin={0.5}
+        rMax={1.8}
+        ySpread={0.04}
+        size={0.03}
+        color="#fff1d6"
         opacity={0.35}
-        seed={22}
+        seed={55}
       />
-      {/* Trojan-ish clumps near Jupiter orbit (simplified) */}
+      {/* Trojans near Jupiter */}
       <ParticleCloud
-        count={400}
-        rMin={4.9}
-        rMax={5.4}
-        ySpread={0.05}
-        size={0.012}
-        color="#c4b5a0"
-        opacity={0.3}
+        count={800}
+        rMin={4.8}
+        rMax={5.5}
+        ySpread={0.08}
+        size={0.03}
+        color="#e7d3b0"
+        opacity={0.5}
         seed={33}
       />
-      {/* Kuiper belt hint */}
+      {/* Outer Kuiper — bigger points so visible at system scale */}
       <ParticleCloud
-        count={1800}
-        rMin={32}
-        rMax={48}
-        ySpread={0.08}
-        size={0.04}
-        color="#94a3b8"
-        opacity={0.35}
+        count={2500}
+        rMin={30}
+        rMax={50}
+        ySpread={0.15}
+        size={0.12}
+        color="#cbd5e1"
+        opacity={0.5}
         seed={44}
-      />
-      {/* Zodiacal dust near sun */}
-      <ParticleCloud
-        count={500}
-        rMin={0.4}
-        rMax={1.6}
-        ySpread={0.015}
-        size={0.02}
-        color="#fff7ed"
-        opacity={0.12}
-        seed={55}
-        twinkle
       />
 
       {PLANETS.filter((p) => p.id !== "sun" && p.kind !== "moon").map((p) => (

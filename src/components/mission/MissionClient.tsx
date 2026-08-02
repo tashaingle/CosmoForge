@@ -56,7 +56,8 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   );
   const [timeScale, setTimeScale] = useState(1000);
   const [paused, setPaused] = useState(false);
-  const [focus, setFocus] = useState<Focus>("craft");
+  // Default to system view so belt / planets are obvious (not craft zoom)
+  const [focus, setFocus] = useState<Focus>("system");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [others, setOthers] = useState<LiveCraftMarker[]>([]);
@@ -514,7 +515,7 @@ export function MissionClient({ craft, readOnly = false }: Props) {
             ))}
           </div>
           <p className="hidden text-xs text-slate-500 md:block">
-            Warp time → fill objective bars → earn credits
+            Tip: camera → System, then zoom out — gold ring = asteroid belt
           </p>
         </div>
         {shareUrl && (
