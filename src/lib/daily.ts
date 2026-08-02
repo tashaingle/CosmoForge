@@ -411,7 +411,7 @@ export function buildDailyBriefing(): DailyBriefing {
     ? "The real sky is busy — good day to fly."
     : inflight.length
       ? "Your fleet is working — finish goals or stamp a world."
-      : "Design, launch, complete objectives, come back tomorrow.";
+      : "One-tap launch a probe — it keeps flying while you’re away.";
 
   return {
     dayKey,

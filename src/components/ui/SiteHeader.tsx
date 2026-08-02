@@ -44,6 +44,18 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
               <EphemerisBadge compact />
             </span>
             <a
+              href="/#fleet"
+              className="hidden rounded-lg border border-white/10 px-2 py-1 text-[11px] text-slate-300 hover:bg-white/5 sm:inline sm:text-xs"
+            >
+              Fleet
+            </a>
+            <a
+              href="/#launch"
+              className="hidden rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-500/20 sm:inline sm:text-xs"
+            >
+              Launch
+            </a>
+            <a
               href="/#shop"
               className="rounded-lg border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold tabular-nums text-amber-200 hover:bg-amber-500/20 sm:px-2.5 sm:text-xs"
               title="Credits & shop"
@@ -51,16 +63,10 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
               ✦ {wallet.credits}
             </a>
             <a
-              href="/#today"
+              href="/#advanced"
               className="hidden rounded-lg border border-white/10 px-2 py-1 text-[11px] text-slate-300 hover:bg-white/5 sm:inline sm:text-xs"
             >
-              Today
-            </a>
-            <a
-              href="/#market"
-              className="hidden rounded-lg border border-white/10 px-2 py-1 text-[11px] text-slate-300 hover:bg-white/5 sm:inline sm:text-xs"
-            >
-              Market
+              Advanced
             </a>
             {cloudSyncing && (
               <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:flex">

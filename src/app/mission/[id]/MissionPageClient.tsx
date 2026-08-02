@@ -58,8 +58,8 @@ export function MissionPageClient({ craftId }: { craftId: string }) {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-slate-950 px-4 text-center text-slate-300">
         <p>No active mission for this craft.</p>
-        <Link href="/#hangar" className="text-cyan-400 hover:underline">
-          Return to hangar
+        <Link href="/#fleet" className="text-cyan-400 hover:underline">
+          Return to fleet
         </Link>
       </div>
     );

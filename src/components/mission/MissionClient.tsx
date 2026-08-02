@@ -15,7 +15,8 @@ import {
   periodDays,
 } from "@/lib/orbital";
 import { computeStats, formatDeltaV, formatMass } from "@/lib/ship";
-import { encodeShare, touchCraftSim, upsertCraft } from "@/lib/storage";
+import { touchCraftSim, upsertCraft } from "@/lib/storage";
+import { shareCraftMission } from "@/lib/share-craft";
 import { fetchLiveCrafts } from "@/lib/cloud-fleet";
 import type { Craft, LiveCraftMarker } from "@/lib/types";
 import { InlineSpinner } from "@/components/ui/LoadingScreen";
@@ -222,35 +223,13 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   };
 
   const onShare = useCallback(async () => {
-    const snapshot = { ...craft, lastSimMs: simMs };
-    try {
-      const res = await fetch("/api/shares", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ craft: snapshot }),
-      });
-      if (res.ok) {
-        const body = (await res.json()) as { path: string };
-        const url = `${window.location.origin}${body.path}`;
-        setShareUrl(url);
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-        return;
-      }
-    } catch {
-      // fall through
-    }
-    const token = encodeShare(snapshot);
-    const url = `${window.location.origin}/share/${token}`;
+    const { url, copied } = await shareCraftMission(
+      { ...craft, lastSimMs: simMs },
+      simMs
+    );
     setShareUrl(url);
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
+    setCopied(copied);
+    if (copied) setTimeout(() => setCopied(false), 2000);
   }, [craft, simMs]);
 
   const doneCount = briefing.objectives.filter((o) =>
@@ -281,10 +260,10 @@ export function MissionClient({ craft, readOnly = false }: Props) {
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {!readOnly && (
             <Link
-              href="/#hangar"
+              href="/#fleet"
               className="shrink-0 text-sm text-slate-400 transition hover:text-cyan-300"
             >
-              ← Hangar
+              ← Fleet
             </Link>
           )}
           <div className="min-w-0">

@@ -59,8 +59,8 @@ export function LaunchClient({ craftId }: { craftId: string }) {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-slate-950 text-slate-300">
         <p>Craft not found.</p>
-        <Link href="/#hangar" className="text-cyan-400">
-          Hangar
+        <Link href="/#fleet" className="text-cyan-400">
+          Fleet
         </Link>
       </div>
     );
