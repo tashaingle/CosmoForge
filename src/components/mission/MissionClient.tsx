@@ -305,7 +305,7 @@ export function MissionClient({ craft, readOnly = false }: Props) {
         </div>
       </header>
 
-      <div className="relative z-10 m-2 flex max-h-[calc(100dvh-8rem)] max-w-[min(100%,22rem)] flex-col gap-2 overflow-y-auto sm:m-4 sm:max-w-sm sm:gap-3">
+      <div className="relative z-10 m-2 mb-[5.5rem] flex max-h-[calc(100dvh-10.5rem)] max-w-[min(100%,22rem)] flex-col gap-2 overflow-y-auto sm:m-4 sm:mb-28 sm:max-h-[calc(100dvh-11rem)] sm:max-w-sm sm:gap-3">
         {/* Purpose — the thing that was missing */}
         <div className="rounded-2xl border border-cyan-400/30 bg-gradient-to-b from-cyan-950/80 to-slate-950/90 p-3 backdrop-blur-md sm:p-4">
           <h2 className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300 sm:text-xs">
@@ -400,9 +400,9 @@ export function MissionClient({ craft, readOnly = false }: Props) {
           <div className="mt-2 flex flex-wrap gap-1.5">
             {(
               [
-                ["earth", "Earth"],
+                ["system", "Free look"],
                 ["craft", "Craft"],
-                ["system", "System"],
+                ["earth", "Earth"],
                 ["moon", "Moon"],
                 ["mars", "Mars"],
                 ["jupiter", "Jupiter"],
@@ -414,10 +414,17 @@ export function MissionClient({ craft, readOnly = false }: Props) {
               <button
                 key={id}
                 type="button"
-                onClick={() => setFocus(id as Focus)}
+                onClick={() =>
+                  // Click active target again → free look (unselect)
+                  setFocus(
+                    focus === id && id !== "system"
+                      ? "system"
+                      : (id as Focus)
+                  )
+                }
                 className={`rounded-md px-2 py-1 text-[11px] sm:text-xs ${
                   focus === id
-                    ? "bg-cyan-500/30 text-cyan-100"
+                    ? "bg-cyan-500/30 text-cyan-100 ring-1 ring-cyan-400/40"
                     : "bg-white/5 text-slate-300 hover:bg-white/10"
                 }`}
               >
@@ -425,17 +432,15 @@ export function MissionClient({ craft, readOnly = false }: Props) {
               </button>
             ))}
           </div>
-          {(focus === "earth" ||
-            (focus === "craft" && craft.orbit?.centralBody === "earth")) && (
-            <p className="mt-2 text-[11px] text-sky-300/80">
-              Globe view — drag to orbit, scroll to zoom (Google Earth–style).
-            </p>
-          )}
+          <p className="mt-2 text-[11px] text-slate-500">
+            {focus === "system"
+              ? "Free look — drag to orbit, scroll to zoom. Pick a world to jump there."
+              : "Tracking target — drag/zoom freely. Click again or Free look to unlock."}
+          </p>
           {focus !== "system" &&
             focus !== "craft" &&
-            focus !== "earth" &&
             getBody(focus) && (
-              <p className="mt-2 text-[11px] text-slate-500">
+              <p className="mt-1 text-[11px] text-slate-600">
                 {getBody(focus)!.blurb}
               </p>
             )}
@@ -467,52 +472,54 @@ export function MissionClient({ craft, readOnly = false }: Props) {
         )}
       </div>
 
-      <div className="relative z-10 mt-auto border-t border-white/10 bg-slate-950/85 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
-        <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPaused((p) => !p)}
-              className="rounded-lg bg-white/10 px-3 py-1.5 text-xs hover:bg-white/15 sm:text-sm"
-            >
-              {paused ? "Resume" : "Pause"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSimMs(launchMs)}
-              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10 sm:text-sm"
-            >
-              Reset
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="mr-1 text-[10px] text-slate-500 sm:text-xs">
-              Time warp
-            </span>
-            {TIME_SCALES.map((t) => (
+      <div className="pointer-events-none relative z-30 mt-auto shrink-0 pb-[env(safe-area-inset-bottom)]">
+        <div className="pointer-events-auto border-t border-cyan-400/25 bg-slate-950/95 px-3 py-3 shadow-[0_-8px_32px_rgba(0,0,0,0.65)] backdrop-blur-xl sm:px-4 sm:py-3.5">
+          <div className="mx-auto flex max-w-5xl flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+            <div className="flex items-center gap-2">
               <button
-                key={t.value}
                 type="button"
-                onClick={() => setTimeScale(t.value)}
-                className={`rounded-md px-2 py-1 text-[11px] font-medium sm:px-2.5 sm:text-xs ${
-                  timeScale === t.value
-                    ? "bg-cyan-500 text-slate-950"
-                    : "bg-white/5 text-slate-300 hover:bg-white/10"
-                }`}
+                onClick={() => setPaused((p) => !p)}
+                className="rounded-lg border border-white/15 bg-white/15 px-3.5 py-2 text-xs font-semibold text-white hover:bg-white/25 sm:text-sm"
               >
-                {t.label}
+                {paused ? "Resume" : "Pause"}
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setSimMs(launchMs)}
+                className="rounded-lg border border-white/10 bg-white/10 px-3.5 py-2 text-xs font-medium text-slate-100 hover:bg-white/15 sm:text-sm"
+              >
+                Reset
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-cyan-300/90 sm:text-xs">
+                Time warp
+              </span>
+              {TIME_SCALES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setTimeScale(t.value)}
+                  className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold sm:px-3 sm:text-xs ${
+                    timeScale === t.value
+                      ? "bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/30"
+                      : "border border-white/10 bg-slate-800/90 text-slate-100 hover:border-cyan-400/30 hover:bg-slate-700"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <p className="hidden text-xs text-slate-400 lg:block">
+              Free look anytime · click a world twice to unlock
+            </p>
           </div>
-          <p className="hidden text-xs text-slate-500 md:block">
-            Tip: camera → System, then zoom out — gold ring = asteroid belt
-          </p>
+          {shareUrl && (
+            <p className="mx-auto mt-2 max-w-5xl truncate text-[11px] text-cyan-300/90 sm:text-xs">
+              Share: {shareUrl}
+            </p>
+          )}
         </div>
-        {shareUrl && (
-          <p className="mx-auto mt-2 max-w-4xl truncate text-[11px] text-cyan-300/80 sm:text-xs">
-            Share: {shareUrl}
-          </p>
-        )}
       </div>
     </div>
   );

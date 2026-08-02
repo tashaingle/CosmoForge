@@ -334,41 +334,60 @@ function CameraRig({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controls = useRef<any>(null);
   const { camera } = useThree();
-  const bodyClose = isBodyCloseFocus(focus, craftOrbit);
+  const prevFocus = useRef(focus);
+  /** Auto-frame only briefly when focus changes — then free orbit/zoom */
+  const frameFrames = useRef(0);
+  const tmpOffset = useRef(new THREE.Vector3());
+  const tmpTarget = useRef(new THREE.Vector3());
 
   useFrame(() => {
     const c = controls.current;
     if (!c) return;
-    let target = new THREE.Vector3(0, 0, 0);
+
+    // Always allow full system zoom — never lock the user in
+    c.minDistance = 0.035;
+    c.maxDistance = 90;
+    c.maxPolarAngle = Math.PI * 0.92;
+
+    if (prevFocus.current !== focus) {
+      prevFocus.current = focus;
+      // ~0.7s of gentle framing when you pick a new target
+      frameFrames.current = focus === "system" ? 0 : 42;
+    }
+
+    // Free look: System mode does not pull the camera or retarget
+    if (focus === "system") {
+      return;
+    }
+
     if (focus === "craft" && craftOrbit) {
       const p = craftScenePosition(craftOrbit, simMs);
-      target.set(p.x, p.y, p.z);
-    } else if (focus !== "system" && focus !== "craft") {
+      tmpTarget.current.set(p.x, p.y, p.z);
+    } else if (focus !== "craft") {
       const p = bodyPositionAU(focus, simMs);
-      target.set(p.x, p.y, p.z);
-    }
-    c.target.lerp(target, 0.08);
-
-    // Close framing for planet/moon inspection (Google Earth–style)
-    if (bodyClose) {
-      c.minDistance = 0.04;
-      c.maxDistance = 3.5;
-      c.maxPolarAngle = Math.PI * 0.9;
-      const offset = camera.position.clone().sub(c.target as THREE.Vector3);
-      const dist = offset.length();
-      const desired = desiredCloseDistance(focus, craftOrbit);
-      if (dist > desired * 2.5 || dist < 0.02) {
-        const next = THREE.MathUtils.lerp(dist, desired, 0.06);
-        if (offset.lengthSq() < 1e-8) {
-          offset.set(0.08, 0.05, 0.1);
-        }
-        offset.setLength(Math.max(next, c.minDistance));
-        camera.position.copy(c.target as THREE.Vector3).add(offset);
-      }
+      tmpTarget.current.set(p.x, p.y, p.z);
     } else {
-      c.minDistance = 0.08;
-      c.maxDistance = 90;
-      c.maxPolarAngle = Math.PI * 0.92;
+      return;
+    }
+
+    // Soft-follow so the body stays under the orbit pivot as it moves
+    c.target.lerp(tmpTarget.current, 0.12);
+
+    // One-shot approach when focus first changes (not every frame forever)
+    if (frameFrames.current > 0) {
+      frameFrames.current -= 1;
+      const desired = desiredCloseDistance(focus, craftOrbit);
+      const offset = tmpOffset.current
+        .copy(camera.position)
+        .sub(c.target as THREE.Vector3);
+      const dist = offset.length();
+      if (offset.lengthSq() < 1e-8) {
+        offset.set(0.1, 0.06, 0.12);
+      }
+      const next = THREE.MathUtils.lerp(dist, desired, 0.12);
+      offset.setLength(Math.max(next, c.minDistance));
+      camera.position.copy(c.target as THREE.Vector3).add(offset);
+      c.update?.();
     }
   });
 
@@ -376,11 +395,15 @@ function CameraRig({
     <OrbitControls
       ref={controls}
       enableDamping
-      dampingFactor={bodyClose ? 0.1 : 0.08}
-      minDistance={bodyClose ? 0.04 : 0.08}
-      maxDistance={bodyClose ? 3.5 : 90}
+      dampingFactor={0.09}
+      minDistance={0.035}
+      maxDistance={90}
       maxPolarAngle={Math.PI * 0.92}
-      rotateSpeed={bodyClose ? 0.55 : 0.8}
+      rotateSpeed={0.75}
+      // User can always drag / zoom after framing
+      enablePan
+      enableZoom
+      enableRotate
     />
   );
 }
