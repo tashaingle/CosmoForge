@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -24,6 +24,7 @@ import {
   allBodyTextureUrls,
   getBodyVisual,
 } from "@/lib/body-visuals";
+import { BodyLabel } from "./BodyLabel";
 
 interface SolarSystemSceneProps {
   simMs: number;
@@ -84,34 +85,59 @@ function BodyMesh({
   const sunPos: [number, number, number] = [sun.x, sun.y, sun.z];
   const position: [number, number, number] = [pos.x, pos.y, pos.z];
 
+  const labelVariant =
+    def.id === "sun" ? "sun" : def.kind === "moon" ? "moon" : "planet";
+
   // Earth keeps the full day/night/clouds treatment
   if (def.id === "earth") {
     return (
-      <EarthGlobe
-        radius={r}
-        position={position}
-        sunPosition={sunPos}
-        showLabel={showLabel}
-        simMs={simMs}
-      />
+      <group position={position}>
+        <EarthGlobe
+          radius={r}
+          position={[0, 0, 0]}
+          sunPosition={[
+            sunPos[0] - position[0],
+            sunPos[1] - position[1],
+            sunPos[2] - position[2],
+          ]}
+          showLabel={false}
+          simMs={simMs}
+        />
+        {showLabel && (
+          <BodyLabel name={def.name} radius={r} variant="planet" />
+        )}
+      </group>
     );
   }
 
   const visual = getBodyVisual(bodyId);
   if (visual?.map) {
     return (
-      <TexturedCelestial
-        radius={r}
-        position={position}
-        sunPosition={sunPos}
-        visual={visual}
-        label={def.name}
-        showLabel={showLabel}
-        simMs={simMs}
-        segments={
-          def.kind === "moon" ? 48 : def.id === "sun" ? 48 : 72
-        }
-      />
+      <group position={position}>
+        <TexturedCelestial
+          radius={r}
+          position={[0, 0, 0]}
+          sunPosition={[
+            sunPos[0] - position[0],
+            sunPos[1] - position[1],
+            sunPos[2] - position[2],
+          ]}
+          visual={visual}
+          label={def.name}
+          showLabel={false}
+          simMs={simMs}
+          segments={
+            def.kind === "moon" ? 48 : def.id === "sun" ? 48 : 72
+          }
+        />
+        {showLabel && (
+          <BodyLabel
+            name={def.name}
+            radius={r}
+            variant={labelVariant}
+          />
+        )}
+      </group>
     );
   }
 
@@ -129,11 +155,7 @@ function BodyMesh({
         />
       </mesh>
       {showLabel && (
-        <Html distanceFactor={7} style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap rounded border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10px] text-cyan-50 shadow">
-            {def.name}
-          </div>
-        </Html>
+        <BodyLabel name={def.name} radius={r} variant={labelVariant} />
       )}
     </group>
   );
@@ -147,6 +169,7 @@ function CraftMarker({
   color = "#22d3ee",
   size = 0.018,
   showTrail = true,
+  showLabel = true,
 }: {
   orbit: OrbitElements;
   simMs: number;
@@ -155,9 +178,12 @@ function CraftMarker({
   color?: string;
   size?: number;
   showTrail?: boolean;
+  showLabel?: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const trail = useRef<THREE.Vector3[]>([]);
+  const { camera } = useThree();
+  const [labelOn, setLabelOn] = useState(true);
 
   useFrame(() => {
     if (!ref.current) return;
@@ -166,6 +192,13 @@ function CraftMarker({
     if (showTrail) {
       trail.current.push(new THREE.Vector3(p.x, p.y, p.z));
       if (trail.current.length > 70) trail.current.shift();
+    }
+    if (showLabel) {
+      const dist = camera.position.distanceTo(
+        new THREE.Vector3(p.x, p.y, p.z)
+      );
+      // Only label when not hugging the craft / planet
+      setLabelOn(dist > 0.2 && dist < 12);
     }
   });
 
@@ -193,21 +226,28 @@ function CraftMarker({
             blending={THREE.AdditiveBlending}
           />
         </mesh>
-        <Html distanceFactor={6} position={[size * 1.6, size * 2.2, 0]}>
-          <div
-            className="max-w-[140px] truncate whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] shadow-lg sm:text-[11px]"
-            style={{
-              background: `${color}22`,
-              borderColor: `${color}66`,
-              color: "#f8fafc",
-            }}
+        {showLabel && labelOn && (
+          <Html
+            center
+            distanceFactor={10}
+            position={[0, size * 3.5, 0]}
+            style={{ pointerEvents: "none" }}
+            zIndexRange={[8, 0]}
           >
-            {name}
-            {subtitle ? (
-              <span className="block text-[9px] opacity-70">{subtitle}</span>
-            ) : null}
-          </div>
-        </Html>
+            <div
+              className="max-w-[120px] select-none truncate whitespace-nowrap rounded-md border bg-slate-950/50 px-1.5 py-0.5 text-[9px] backdrop-blur-[2px]"
+              style={{
+                borderColor: `${color}44`,
+                color: "#e2e8f0",
+              }}
+            >
+              {name}
+              {subtitle ? (
+                <span className="block text-[8px] opacity-60">{subtitle}</span>
+              ) : null}
+            </div>
+          </Html>
+        )}
       </group>
       {showTrail && trail.current.length > 2 && (
         <Line
@@ -463,7 +503,8 @@ export function SolarSystemScene({
           key={p.id}
           bodyId={p.id}
           simMs={simMs}
-          showLabel={p.id !== "sun"}
+          // Overview only — hide when inspecting a world so textures stay clear
+          showLabel={focus === "system" && p.id !== "sun"}
           closeBoost={bodyClose && focusBodyId === p.id}
         />
       ))}
@@ -473,7 +514,10 @@ export function SolarSystemScene({
           key={m.id}
           bodyId={m.id}
           simMs={simMs}
-          showLabel
+          // Moon tags only when looking at the parent planet (not on top of the moon itself)
+          showLabel={
+            focus === m.parentId && focusBodyId !== m.id
+          }
           scale={focus === m.parentId || focus === m.id ? 1.15 : 0.9}
           closeBoost={focusBodyId === m.id}
         />
@@ -493,6 +537,7 @@ export function SolarSystemScene({
           }
           size={0.012}
           showTrail={false}
+          showLabel={focus === "system" || focus === "craft"}
         />
       ))}
 
@@ -504,6 +549,7 @@ export function SolarSystemScene({
             simMs={simMs}
             name={craftName}
             color={playerColor}
+            showLabel={focus === "system" || focus === "craft"}
           />
         </>
       )}
