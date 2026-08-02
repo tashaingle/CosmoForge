@@ -19,6 +19,7 @@ import { LoadingScreen, InlineSpinner } from "@/components/ui/LoadingScreen";
 import { SkyEventsPanel } from "@/components/events/SkyEventsPanel";
 import { CosmeticsShop } from "@/components/shop/CosmeticsShop";
 import { MarketplacePanel } from "@/components/market/MarketplacePanel";
+import { SolarPassportPanel } from "@/components/passport/SolarPassportPanel";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
 import type { PlayerWallet } from "@/lib/economy";
@@ -106,10 +107,12 @@ export function HangarClient() {
               </span>
             </h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-400 sm:text-lg">
-              You&apos;re a commander with a job: design a ship, pick a mission,
-              complete objectives (orbits, scans, reach Mars…), earn credits,
-              and buy cosmetics — while the real sky (JPL / solar weather)
-              boosts paydays.
+              Explore a living solar system — planets, major moons, live NEOs —
+              complete mission goals, stamp your{" "}
+              <strong className="font-medium text-slate-200">
+                solar passport
+              </strong>
+              , and come back when the real sky changes the rewards.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -249,6 +252,10 @@ export function HangarClient() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section id="passport" className="relative mx-auto max-w-6xl px-4 pb-8">
+        <SolarPassportPanel />
       </section>
 
       {/* Events + shop */}

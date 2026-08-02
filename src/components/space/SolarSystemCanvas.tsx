@@ -2,7 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense } from "react";
-import type { PlanetId } from "@/lib/constants";
+import type { BodyId } from "@/lib/bodies";
 import type { OrbitElements } from "@/lib/orbital";
 import type { LiveCraftMarker } from "@/lib/types";
 import { SolarSystemScene } from "./SolarSystemScene";
@@ -12,7 +12,7 @@ interface Props {
   craftOrbit?: OrbitElements | null;
   craftName?: string;
   craftSkinId?: string;
-  focus: "system" | "craft" | PlanetId;
+  focus: "system" | "craft" | BodyId;
   otherCrafts?: LiveCraftMarker[];
   className?: string;
 }

@@ -4,10 +4,13 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html, Line, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
-import { PLANETS, type PlanetId } from "@/lib/constants";
+import { MOONS, PLANETS, type BodyId } from "@/lib/bodies";
+import {
+  bodyPositionAU,
+  getBody,
+} from "@/lib/bodies";
 import {
   craftScenePosition,
-  planetPositionAU,
   type OrbitElements,
 } from "@/lib/orbital";
 import type { LiveCraftMarker } from "@/lib/types";
@@ -18,7 +21,7 @@ interface SolarSystemSceneProps {
   craftOrbit?: OrbitElements | null;
   craftName?: string;
   craftSkinId?: string;
-  focus: "system" | "craft" | PlanetId;
+  focus: "system" | "craft" | BodyId;
   otherCrafts?: LiveCraftMarker[];
 }
 
@@ -38,43 +41,44 @@ function OrbitRing({ radius, color }: { radius: number; color: string }) {
       color={color}
       lineWidth={0.5}
       transparent
-      opacity={0.25}
+      opacity={0.22}
     />
   );
 }
 
-function PlanetBody({
-  planetId,
+function BodyMesh({
+  bodyId,
   simMs,
   showLabel,
+  scale = 1,
 }: {
-  planetId: PlanetId;
+  bodyId: BodyId;
   simMs: number;
   showLabel: boolean;
+  scale?: number;
 }) {
-  const def = PLANETS.find((p) => p.id === planetId)!;
-  const pos = planetPositionAU(planetId, simMs);
+  const def = getBody(bodyId)!;
+  const pos = bodyPositionAU(bodyId, simMs);
+  const r = def.visualRadius * scale;
 
   return (
     <group position={[pos.x, pos.y, pos.z]}>
       <mesh>
-        <sphereGeometry args={[def.visualRadius, 32, 32]} />
+        <sphereGeometry args={[r, 28, 28]} />
         <meshStandardMaterial
           color={def.color}
           emissive={def.emissive ?? "#000000"}
-          emissiveIntensity={def.id === "sun" ? 1.2 : 0.05}
+          emissiveIntensity={def.id === "sun" ? 1.2 : 0.06}
           roughness={0.55}
-          metalness={0.15}
+          metalness={0.12}
         />
       </mesh>
       {def.id === "sun" && (
-        <pointLight color="#ffd27a" intensity={2.5} distance={80} decay={0.4} />
+        <pointLight color="#ffd27a" intensity={2.6} distance={90} decay={0.4} />
       )}
       {def.id === "saturn" && (
         <mesh rotation={[Math.PI / 2.4, 0, 0.2]}>
-          <ringGeometry
-            args={[def.visualRadius * 1.3, def.visualRadius * 2.1, 64]}
-          />
+          <ringGeometry args={[r * 1.3, r * 2.15, 64]} />
           <meshBasicMaterial
             color="#d4c4a0"
             side={THREE.DoubleSide}
@@ -84,7 +88,7 @@ function PlanetBody({
         </mesh>
       )}
       {showLabel && (
-        <Html distanceFactor={8} style={{ pointerEvents: "none" }}>
+        <Html distanceFactor={bodyId === "sun" ? 12 : 8} style={{ pointerEvents: "none" }}>
           <div className="whitespace-nowrap rounded border border-white/10 bg-black/60 px-1.5 py-0.5 text-[10px] text-cyan-100">
             {def.name}
           </div>
@@ -184,7 +188,7 @@ function CraftOrbitPreview({
     const spanMs =
       orbit.centralBody === "earth"
         ? 90 * 60 * 1000
-        : 200 * 24 * 3600 * 1000;
+        : 400 * 24 * 3600 * 1000;
     for (let i = 0; i <= samples; i++) {
       const t = simMs + (i / samples) * spanMs;
       const p = craftScenePosition(orbit, t);
@@ -224,7 +228,7 @@ function CameraRig({
       const p = craftScenePosition(craftOrbit, simMs);
       target.set(p.x, p.y, p.z);
     } else if (focus !== "system" && focus !== "craft") {
-      const p = planetPositionAU(focus, simMs);
+      const p = bodyPositionAU(focus, simMs);
       target.set(p.x, p.y, p.z);
     }
     c.target.lerp(target, 0.08);
@@ -235,14 +239,33 @@ function CameraRig({
       ref={controls}
       enableDamping
       dampingFactor={0.08}
-      minDistance={0.15}
-      maxDistance={55}
+      minDistance={0.08}
+      maxDistance={80}
       maxPolarAngle={Math.PI * 0.92}
     />
   );
 }
 
 const OTHER_COLORS = ["#a78bfa", "#f472b6", "#fbbf24", "#34d399", "#60a5fa"];
+
+/** Show moons when focused on their parent, craft, system (major only), or the moon itself */
+function visibleMoons(focus: SolarSystemSceneProps["focus"]): typeof MOONS {
+  if (focus === "system") {
+    // Only big tour moons in system view
+    return MOONS.filter((m) =>
+      ["moon", "europa", "titan", "ganymede"].includes(m.id)
+    );
+  }
+  if (focus === "craft") {
+    return MOONS.filter((m) =>
+      ["moon", "europa", "titan", "io", "ganymede", "callisto"].includes(m.id)
+    );
+  }
+  const body = getBody(focus);
+  if (!body) return [];
+  if (body.kind === "moon") return MOONS.filter((m) => m.id === body.id || m.parentId === body.parentId);
+  return MOONS.filter((m) => m.parentId === focus);
+}
 
 export function SolarSystemScene({
   simMs,
@@ -253,31 +276,42 @@ export function SolarSystemScene({
   otherCrafts = [],
 }: SolarSystemSceneProps) {
   const playerColor = getSkin(craftSkinId).color;
+  const moons = visibleMoons(focus);
 
   return (
     <>
       <color attach="background" args={["#020617"]} />
       <ambientLight intensity={0.12} />
       <Stars
-        radius={80}
-        depth={40}
-        count={4500}
+        radius={100}
+        depth={50}
+        count={5000}
         factor={3}
         saturation={0}
         fade
-        speed={0.4}
+        speed={0.35}
       />
 
-      {PLANETS.filter((p) => p.id !== "sun").map((p) => (
+      {PLANETS.filter((p) => p.id !== "sun" && p.kind !== "moon").map((p) => (
         <OrbitRing key={p.id} radius={p.a} color="#334155" />
       ))}
 
       {PLANETS.map((p) => (
-        <PlanetBody
+        <BodyMesh
           key={p.id}
-          planetId={p.id}
+          bodyId={p.id}
           simMs={simMs}
           showLabel={p.id !== "sun"}
+        />
+      ))}
+
+      {moons.map((m) => (
+        <BodyMesh
+          key={m.id}
+          bodyId={m.id}
+          simMs={simMs}
+          showLabel
+          scale={focus === m.parentId || focus === m.id ? 1.15 : 0.9}
         />
       ))}
 

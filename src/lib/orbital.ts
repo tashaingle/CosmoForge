@@ -3,16 +3,16 @@ import {
   EPOCH_MS,
   MU_EARTH_KM3_S2,
   MU_SUN_KM3_S2,
-  PLANETS,
   SECONDS_PER_DAY,
-  type PlanetId,
 } from "./constants";
+import {
+  bodyPositionAU,
+  type BodyId,
+  type Vec3,
+} from "./bodies";
 
-export interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
+export type { Vec3 } from "./bodies";
+export type { BodyId, PlanetId } from "./bodies";
 
 /** Keplerian elements for craft around the Sun (heliocentric) or Earth (geocentric LEO) */
 export interface OrbitElements {
@@ -39,6 +39,12 @@ export type MissionProfileId =
   | "lunar"
   | "mars_transfer"
   | "asteroid_belt"
+  | "venus_flyby"
+  | "mercury_scout"
+  | "jupiter_transfer"
+  | "europa_scout"
+  | "saturn_transfer"
+  | "titan_scout"
   | "event_meteor_watch"
   | "event_mars_rush"
   | "event_storm_rider"
@@ -53,23 +59,42 @@ export interface MissionProfile {
   difficulty: "easy" | "medium" | "hard";
   /** Only offered while matching sky event is active */
   eventOnly?: boolean;
+  /** Primary destination for passport discovery */
+  targetBody?: BodyId;
 }
 
 export const MISSION_PROFILES: MissionProfile[] = [
   {
     id: "leo",
     name: "Low Earth Orbit",
-    description: "Park in LEO and watch Earth turn beneath you.",
-    // Alpha thresholds are play-first (real LEO insertion is ~9.4 km/s from surface).
+    description: "Park in LEO — checkout systems and log Earth orbits.",
     minDeltaV: 800,
     difficulty: "easy",
+    targetBody: "earth",
   },
   {
     id: "lunar",
     name: "Lunar Transfer",
-    description: "Escape Earth and cruise toward the Moon’s neighborhood.",
+    description: "Climb toward the Moon’s neighborhood.",
     minDeltaV: 1800,
     difficulty: "medium",
+    targetBody: "moon",
+  },
+  {
+    id: "venus_flyby",
+    name: "Venus Transfer",
+    description: "Fall sunward toward Venus.",
+    minDeltaV: 3000,
+    difficulty: "hard",
+    targetBody: "venus",
+  },
+  {
+    id: "mercury_scout",
+    name: "Mercury Scout",
+    description: "Deep sunward cruise to Mercury’s realm.",
+    minDeltaV: 4200,
+    difficulty: "hard",
+    targetBody: "mercury",
   },
   {
     id: "mars_transfer",
@@ -77,13 +102,47 @@ export const MISSION_PROFILES: MissionProfile[] = [
     description: "Heliocentric transfer ellipse toward Mars.",
     minDeltaV: 2800,
     difficulty: "hard",
+    targetBody: "mars",
   },
   {
     id: "asteroid_belt",
     name: "Belt Scout",
-    description: "Stretch toward the inner asteroid belt (~2.2 AU).",
+    description: "Push into the main belt — Ceres country.",
     minDeltaV: 3800,
     difficulty: "hard",
+    targetBody: "ceres",
+  },
+  {
+    id: "jupiter_transfer",
+    name: "Jupiter Cruise",
+    description: "Long haul to the gas giant system.",
+    minDeltaV: 5200,
+    difficulty: "hard",
+    targetBody: "jupiter",
+  },
+  {
+    id: "europa_scout",
+    name: "Europa Approach",
+    description: "Jupiter transfer aimed at ice-moon science.",
+    minDeltaV: 5600,
+    difficulty: "hard",
+    targetBody: "europa",
+  },
+  {
+    id: "saturn_transfer",
+    name: "Saturn Cruise",
+    description: "Ringed giant — years of cruise condensed by warp.",
+    minDeltaV: 6200,
+    difficulty: "hard",
+    targetBody: "saturn",
+  },
+  {
+    id: "titan_scout",
+    name: "Titan Approach",
+    description: "Saturn system for methane-world recon.",
+    minDeltaV: 6500,
+    difficulty: "hard",
+    targetBody: "titan",
   },
   {
     id: "event_meteor_watch",
@@ -93,6 +152,7 @@ export const MISSION_PROFILES: MissionProfile[] = [
     minDeltaV: 1100,
     difficulty: "medium",
     eventOnly: true,
+    targetBody: "earth",
   },
   {
     id: "event_mars_rush",
@@ -102,6 +162,7 @@ export const MISSION_PROFILES: MissionProfile[] = [
     minDeltaV: 2600,
     difficulty: "hard",
     eventOnly: true,
+    targetBody: "mars",
   },
   {
     id: "event_storm_rider",
@@ -111,6 +172,7 @@ export const MISSION_PROFILES: MissionProfile[] = [
     minDeltaV: 1400,
     difficulty: "medium",
     eventOnly: true,
+    targetBody: "earth",
   },
   {
     id: "event_eclipse_chase",
@@ -120,6 +182,7 @@ export const MISSION_PROFILES: MissionProfile[] = [
     minDeltaV: 1000,
     difficulty: "medium",
     eventOnly: true,
+    targetBody: "earth",
   },
 ];
 
@@ -136,24 +199,8 @@ export function daysSinceEpoch(ms: number): number {
   return (ms - EPOCH_MS) / (SECONDS_PER_DAY * 1000);
 }
 
-export function planetPositionAU(planetId: PlanetId, simMs: number): Vec3 {
-  const p = PLANETS.find((x) => x.id === planetId);
-  if (!p || p.id === "sun") return { x: 0, y: 0, z: 0 };
-  const days = daysSinceEpoch(simMs);
-  // Phase offset so planets aren't all lined up at epoch
-  const phase = hashPhase(p.id);
-  const theta = ((2 * Math.PI * days) / p.periodDays + phase) % (2 * Math.PI);
-  return {
-    x: p.a * Math.cos(theta),
-    y: 0,
-    z: p.a * Math.sin(theta),
-  };
-}
-
-function hashPhase(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return (h % 1000) / 1000 * Math.PI * 2;
+export function planetPositionAU(planetId: BodyId, simMs: number): Vec3 {
+  return bodyPositionAU(planetId, simMs);
 }
 
 /** Solve Kepler's equation M = E - e sin E */
@@ -248,11 +295,40 @@ export function periodDays(elements: OrbitElements): number {
   return T / SECONDS_PER_DAY;
 }
 
+function heliosTransfer(
+  rpAu: number,
+  raAu: number,
+  earthAngle: number,
+  launchMs: number,
+  i = 0.04,
+  /** perihelion < 1 AU (sunward) — swap so peri is inner */
+  sunward = false
+): OrbitElements {
+  let rp = Math.min(rpAu, raAu) * AU_KM;
+  let ra = Math.max(rpAu, raAu) * AU_KM;
+  if (sunward) {
+    rp = Math.min(rpAu, raAu) * AU_KM;
+    ra = Math.max(rpAu, raAu) * AU_KM;
+  }
+  const a = (rp + ra) / 2;
+  const e = (ra - rp) / (ra + rp);
+  return {
+    a,
+    e,
+    i,
+    raan: earthAngle,
+    argPeri: sunward ? earthAngle + Math.PI : earthAngle,
+    meanAnomaly0: sunward ? Math.PI : 0,
+    epochMs: launchMs,
+    centralBody: "sun",
+  };
+}
+
 /** Build orbit elements for a mission profile at launch time */
 export function createOrbitForMission(
   missionId: MissionProfileId,
   launchMs: number,
-  shipDeltaV: number
+  _shipDeltaV: number
 ): OrbitElements {
   const earth = planetPositionAU("earth", launchMs);
   const earthAngle = Math.atan2(earth.z, earth.x);
@@ -290,39 +366,24 @@ export function createOrbitForMission(
       };
     }
     case "mars_transfer": {
-      // Hohmann-like: perihelion ~1 AU, aphelion ~1.52 AU
-      const rp = 1.0 * AU_KM;
-      const ra = 1.52 * AU_KM;
-      // Bonus eccentricity stretch if high delta-v
-      const bonus = Math.min(0.08, Math.max(0, (shipDeltaV - 4500) / 20000));
-      const a = (rp + ra) / 2;
-      const e = Math.min(0.45, (ra - rp) / (ra + rp) + bonus);
-      return {
-        a,
-        e,
-        i: 0.03,
-        raan: earthAngle,
-        argPeri: earthAngle,
-        meanAnomaly0: 0,
-        epochMs: launchMs,
-        centralBody: "sun",
-      };
+      return heliosTransfer(1.0, 1.52, earthAngle, launchMs, 0.03);
     }
     case "asteroid_belt": {
-      const rp = 1.0 * AU_KM;
-      const ra = 2.2 * AU_KM;
-      const a = (rp + ra) / 2;
-      const e = (ra - rp) / (ra + rp);
-      return {
-        a,
-        e,
-        i: 0.05,
-        raan: earthAngle,
-        argPeri: earthAngle,
-        meanAnomaly0: 0,
-        epochMs: launchMs,
-        centralBody: "sun",
-      };
+      return heliosTransfer(1.0, 2.2, earthAngle, launchMs, 0.05);
+    }
+    case "venus_flyby": {
+      return heliosTransfer(0.72, 1.0, earthAngle, launchMs, 0.03, true);
+    }
+    case "mercury_scout": {
+      return heliosTransfer(0.39, 1.0, earthAngle, launchMs, 0.07, true);
+    }
+    case "jupiter_transfer":
+    case "europa_scout": {
+      return heliosTransfer(1.0, 5.2, earthAngle, launchMs, 0.04);
+    }
+    case "saturn_transfer":
+    case "titan_scout": {
+      return heliosTransfer(1.0, 9.5, earthAngle, launchMs, 0.05);
     }
     case "event_meteor_watch": {
       const r = 6371 + 550;

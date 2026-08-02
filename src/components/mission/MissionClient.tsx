@@ -4,8 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SolarSystemCanvas } from "@/components/space/SolarSystemCanvas";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { TIME_SCALES, type PlanetId } from "@/lib/constants";
+import { TIME_SCALES } from "@/lib/constants";
+import type { BodyId } from "@/lib/bodies";
+import { PASSPORT_BODIES, bodyPositionAU, getBody } from "@/lib/bodies";
 import {
+  craftScenePosition,
   formatDistanceAU,
   heliocentricDistanceAU,
   MISSION_PROFILES,
@@ -19,6 +22,7 @@ import { InlineSpinner } from "@/components/ui/LoadingScreen";
 import {
   claimLaunchReward,
   claimObjectiveReward,
+  loadWallet,
 } from "@/lib/economy";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
@@ -31,8 +35,12 @@ import {
   type CraftObjectiveState,
   type ObjectiveContext,
 } from "@/lib/mission-objectives";
+import {
+  discoverBody,
+  discoveryRewardCredits,
+} from "@/lib/passport";
 
-type Focus = "system" | "craft" | PlanetId;
+type Focus = "system" | "craft" | BodyId;
 
 interface Props {
   craft: Craft;
@@ -166,6 +174,37 @@ export function MissionClient({ craft, readOnly = false }: Props) {
       return () => clearTimeout(t);
     }
   }, [ctx, briefing.objectives, craft.id, readOnly, persistWallet]);
+
+  // Solar passport: stamp bodies when craft flies near them
+  useEffect(() => {
+    if (readOnly || !orbit) return;
+    const craftPos = craftScenePosition(orbit, simMs);
+    for (const body of PASSPORT_BODIES) {
+      const bp = bodyPositionAU(body.id, simMs);
+      const dx = craftPos.x - bp.x;
+      const dy = craftPos.y - bp.y;
+      const dz = craftPos.z - bp.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      // Threshold: larger for outer planets, tighter for moons (visual scale)
+      const thresh =
+        body.kind === "moon"
+          ? (body.visualOrbitAu ?? 0.08) * 1.4
+          : Math.max(0.12, body.a * 0.08);
+      if (d < thresh) {
+        const { isNew } = discoverBody(body.id);
+        if (isNew) {
+          const bonus = discoveryRewardCredits(body.id);
+          const w = loadWallet();
+          w.credits += bonus;
+          void persistWallet(w);
+          setRewardToast(
+            `Passport: ${body.name} stamped · +✦ ${bonus}`
+          );
+          window.setTimeout(() => setRewardToast(null), 5000);
+        }
+      }
+    }
+  }, [simMs, orbit, readOnly, persistWallet]);
 
   const distanceAU = orbit ? heliocentricDistanceAU(orbit, simMs) : 0;
   const missionDaysVal = (simMs - launchMs) / (86400 * 1000);
@@ -380,8 +419,12 @@ export function MissionClient({ craft, readOnly = false }: Props) {
                 ["craft", "Craft"],
                 ["system", "System"],
                 ["earth", "Earth"],
+                ["moon", "Moon"],
                 ["mars", "Mars"],
                 ["jupiter", "Jupiter"],
+                ["europa", "Europa"],
+                ["saturn", "Saturn"],
+                ["titan", "Titan"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -398,6 +441,11 @@ export function MissionClient({ craft, readOnly = false }: Props) {
               </button>
             ))}
           </div>
+          {focus !== "system" && focus !== "craft" && getBody(focus) && (
+            <p className="mt-2 text-[11px] text-slate-500">
+              {getBody(focus)!.blurb}
+            </p>
+          )}
         </div>
 
         {activeEvents.length > 0 && !readOnly && (

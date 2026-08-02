@@ -60,7 +60,7 @@ function geoAltitudeKm(ctx: ObjectiveContext): number {
 
 function distToPlanetAU(
   ctx: ObjectiveContext,
-  planet: "mars" | "earth" | "jupiter"
+  planet: "mars" | "earth" | "jupiter" | "venus" | "mercury" | "saturn"
 ): number {
   const c = craftScenePosition(ctx.orbit, ctx.simMs);
   const p = planetPositionAU(planet, ctx.simMs);
@@ -309,7 +309,166 @@ const BRIEFS: Record<string, Omit<MissionBriefing, "objectives"> & { objectives:
       ),
     ],
   },
+  venus_flyby: {
+    missionId: "venus_flyby",
+    purpose: "Fall sunward and approach Venus.",
+    winCondition: "Get within 0.25 AU of Venus.",
+    howTo: "Warp the transfer; stamp Venus in your passport.",
+    objectives: [
+      obj(
+        "ven_in",
+        "Drop below 0.9 AU",
+        "Leave Earth’s solar distance.",
+        90,
+        (ctx) => (1.0 - heliocentricDistanceAU(ctx.orbit, ctx.simMs)) / 0.1
+      ),
+      obj(
+        "ven_near",
+        "Approach Venus",
+        "Within 0.25 AU of the planet.",
+        160,
+        (ctx) => {
+          const d = distToPlanetAU(ctx, "venus");
+          return (0.8 - d) / (0.8 - 0.25);
+        }
+      ),
+      obj(
+        "ven_scan",
+        "Run 2 scans",
+        "Atmosphere approach science.",
+        50,
+        (ctx) => ctx.scanCount / 2
+      ),
+    ],
+  },
+  mercury_scout: {
+    missionId: "mercury_scout",
+    purpose: "Push deep sunward toward Mercury.",
+    winCondition: "Reach Mercury’s neighborhood.",
+    howTo: "Long sunward warp — heat is fictional, glory is real.",
+    objectives: [
+      obj(
+        "mer_05",
+        "Reach 0.6 AU",
+        "Inner-system heat shield territory.",
+        100,
+        (ctx) => (1.0 - heliocentricDistanceAU(ctx.orbit, ctx.simMs)) / 0.4
+      ),
+      obj(
+        "mer_near",
+        "Approach Mercury",
+        "Within 0.2 AU of Mercury.",
+        180,
+        (ctx) => {
+          const d = distToPlanetAU(ctx, "mercury");
+          return (0.7 - d) / (0.7 - 0.2);
+        }
+      ),
+    ],
+  },
+  jupiter_transfer: {
+    missionId: "jupiter_transfer",
+    purpose: "Cruise to the Jovian system.",
+    winCondition: "Get close enough to stamp Jupiter.",
+    howTo: "Use high time warp — this is a long haul.",
+    objectives: [
+      obj(
+        "jup_3",
+        "Reach 3 AU",
+        "Past the main belt.",
+        100,
+        (ctx) => (heliocentricDistanceAU(ctx.orbit, ctx.simMs) - 1) / 2
+      ),
+      obj(
+        "jup_near",
+        "Approach Jupiter",
+        "Within 0.8 AU of Jupiter.",
+        220,
+        (ctx) => {
+          const d = distToPlanetAU(ctx, "jupiter");
+          return (4 - d) / (4 - 0.8);
+        }
+      ),
+    ],
+  },
+  europa_scout: {
+    missionId: "europa_scout",
+    purpose: "Aim for Jupiter’s ice moon — ocean-world science.",
+    winCondition: "Enter Jovian space and log ice-moon scans.",
+    howTo: "Warp to Jupiter; scan for Europa science.",
+    objectives: [
+      obj(
+        "eu_jup",
+        "Approach Jupiter system",
+        "Within 1 AU of Jupiter.",
+        180,
+        (ctx) => {
+          const d = distToPlanetAU(ctx, "jupiter");
+          return (4 - d) / (4 - 1);
+        }
+      ),
+      obj(
+        "eu_scan",
+        "Run 3 ice-moon scans",
+        "Prep data for ocean-world follow-ups.",
+        100,
+        (ctx) => ctx.scanCount / 3
+      ),
+    ],
+  },
+  saturn_transfer: {
+    missionId: "saturn_transfer",
+    purpose: "Reach the ringed giant.",
+    winCondition: "Stamp Saturn on your passport.",
+    howTo: "Maximum warp. Bring patience (or 1M×).",
+    objectives: [
+      obj(
+        "sat_5",
+        "Reach 5 AU",
+        "Jupiter’s neighborhood en route.",
+        110,
+        (ctx) => (heliocentricDistanceAU(ctx.orbit, ctx.simMs) - 1) / 4
+      ),
+      obj(
+        "sat_near",
+        "Approach Saturn",
+        "Within 1.2 AU of Saturn.",
+        250,
+        (ctx) => {
+          const d = distToPlanetAU(ctx, "saturn");
+          return (8 - d) / (8 - 1.2);
+        }
+      ),
+    ],
+  },
+  titan_scout: {
+    missionId: "titan_scout",
+    purpose: "Saturn system recon for Titan — lakes of methane.",
+    winCondition: "Enter Saturn space and scan.",
+    howTo: "Warp deep outer system; stamp Titan when close enough.",
+    objectives: [
+      obj(
+        "ti_sat",
+        "Approach Saturn system",
+        "Within 1.5 AU of Saturn.",
+        200,
+        (ctx) => {
+          const d = distToPlanetAU(ctx, "saturn");
+          return (8 - d) / (8 - 1.5);
+        }
+      ),
+      obj(
+        "ti_scan",
+        "Run 3 Titan scans",
+        "Organic haze dataset.",
+        110,
+        (ctx) => ctx.scanCount / 3
+      ),
+    ],
+  },
 };
+
+// distToPlanetAU already supports mars/earth/jupiter — extend for more
 
 export function getMissionBriefing(
   missionId: MissionProfileId | undefined
