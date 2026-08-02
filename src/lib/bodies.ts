@@ -431,12 +431,22 @@ export interface Vec3 {
   z: number;
 }
 
-/** Heliocentric position in AU (planets/dwarfs) or parent-relative exaggerated for moons */
+/**
+ * Heliocentric position in AU.
+ * Prefers JPL Horizons cache when loaded (client); falls back to Kepler.
+ * Moons: Moon uses Horizons heliocentric when available; others orbit parent
+ * with exaggerated visual radius for readability.
+ */
 export function bodyPositionAU(id: BodyId, simMs: number): Vec3 {
   const b = getBody(id);
   if (!b || b.id === "sun") return { x: 0, y: 0, z: 0 };
 
+  // Client-only Horizons path (dynamic require avoided — set via hook)
+  const eph = getEphemerisLookup()?.(id, simMs);
+  if (eph) return eph;
+
   if (b.kind === "moon" && b.parentId) {
+    // If we have Horizons Moon as absolute, handled above when id===moon
     const parent = bodyPositionAU(b.parentId, simMs);
     const days = daysSinceEpoch(simMs);
     const phase = deg2rad(b.L0Deg) + (2 * Math.PI * days) / b.periodDays;
@@ -449,9 +459,9 @@ export function bodyPositionAU(id: BodyId, simMs: number): Vec3 {
     };
   }
 
-  // Heliocentric Kepler (2D + slight inclination)
+  // Heliocentric Kepler fallback
   const days = daysSinceEpoch(simMs);
-  const n = (2 * Math.PI) / b.periodDays; // rad/day
+  const n = (2 * Math.PI) / b.periodDays;
   const L = deg2rad(b.L0Deg) + n * days;
   const peri = deg2rad(b.periDeg);
   const M = wrap2pi(L - peri);
@@ -468,6 +478,18 @@ export function bodyPositionAU(id: BodyId, simMs: number): Vec3 {
     y: r * Math.sin(u) * Math.sin(inc) * 0.4,
     z: r * Math.sin(u) * Math.cos(inc),
   };
+}
+
+type EphLookup = (id: BodyId, simMs: number) => Vec3 | null;
+let ephemerisLookup: EphLookup | null = null;
+
+/** Called from client when Horizons bundle is ready */
+export function setEphemerisLookup(fn: EphLookup | null): void {
+  ephemerisLookup = fn;
+}
+
+function getEphemerisLookup(): EphLookup | null {
+  return ephemerisLookup;
 }
 
 /** Alias used across codebase */

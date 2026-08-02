@@ -55,6 +55,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | Landing polish + mobile layout | ✅ |
 | Sky events (catalog calendar) | ✅ |
 | Live JPL CAD + NASA DONKI feed | ✅ |
+| JPL Horizons planet/Moon ephemeris bake | ✅ |
 | Credits economy + cosmetics shop | ✅ |
 | Player marketplace (25% take-rate) | ✅ |
 | AI co-pilot / AR | ⏳ |

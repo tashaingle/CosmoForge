@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { EphemerisProvider } from "@/components/ephemeris/EphemerisProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,7 +50,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-[100dvh] flex-col bg-slate-950 text-slate-100">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <EphemerisProvider>{children}</EphemerisProvider>
+        </AuthProvider>
       </body>
     </html>
   );

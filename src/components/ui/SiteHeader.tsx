@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { EphemerisBadge } from "@/components/ephemeris/EphemerisBadge";
 import { InlineSpinner } from "./LoadingScreen";
 
 export function SiteHeader({ compact = false }: { compact?: boolean }) {
@@ -39,6 +40,9 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden sm:inline">
+              <EphemerisBadge compact />
+            </span>
             <a
               href="/#shop"
               className="rounded-lg border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold tabular-nums text-amber-200 hover:bg-amber-500/20 sm:px-2.5 sm:text-xs"

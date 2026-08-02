@@ -39,6 +39,7 @@ import {
   discoverBody,
   discoveryRewardCredits,
 } from "@/lib/passport";
+import { EphemerisBadge } from "@/components/ephemeris/EphemerisBadge";
 
 type Focus = "system" | "craft" | BodyId;
 
@@ -297,6 +298,7 @@ export function MissionClient({ craft, readOnly = false }: Props) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <EphemerisBadge compact />
           {liveLoading && <InlineSpinner />}
           {!readOnly && (
             <>
