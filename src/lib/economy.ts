@@ -156,6 +156,22 @@ export function computeLaunchReward(
   };
 }
 
+export function claimObjectiveReward(
+  craftId: string,
+  objectiveId: string,
+  amount: number
+): { wallet: PlayerWallet; gained: number; alreadyClaimed: boolean } {
+  const wallet = loadWallet();
+  const key = `${craftId}:${objectiveId}`;
+  if (wallet.claimedMilestones.includes(key)) {
+    return { wallet, gained: 0, alreadyClaimed: true };
+  }
+  wallet.claimedMilestones.push(key);
+  wallet.credits += amount;
+  saveWallet(wallet);
+  return { wallet, gained: amount, alreadyClaimed: false };
+}
+
 export function claimLaunchReward(
   craftId: string,
   missionId: MissionProfileId

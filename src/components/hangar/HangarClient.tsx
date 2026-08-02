@@ -106,9 +106,10 @@ export function HangarClient() {
               </span>
             </h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-400 sm:text-lg">
-              Build modular spacecraft, fly a living solar system with real-ish
-              orbital mechanics, and share the sky with other commanders. Your
-              probe keeps flying when you&apos;re offline.
+              You&apos;re a commander with a job: design a ship, pick a mission,
+              complete objectives (orbits, scans, reach Mars…), earn credits,
+              and buy cosmetics — while the real sky (JPL / solar weather)
+              boosts paydays.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">

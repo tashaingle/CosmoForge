@@ -17,6 +17,7 @@ import {
   isMissionBoosted,
 } from "@/lib/sky-events";
 import { computeLaunchReward } from "@/lib/economy";
+import { missionPurposeLine } from "@/lib/mission-objectives";
 
 export function LaunchClient({ craftId }: { craftId: string }) {
   const router = useRouter();
@@ -174,11 +175,15 @@ export function LaunchClient({ craftId }: { craftId: string }) {
                     <p className="mt-1 text-sm text-slate-400">
                       {m.description}
                     </p>
+                    <p className="mt-1 text-xs text-cyan-200/90">
+                      Goal: {missionPurposeLine(m.id)}
+                    </p>
                     <p className="mt-1 text-xs text-amber-200/90">
-                      Reward ~✦ {mReward.total}
+                      Launch pay ~✦ {mReward.total}
                       {mReward.multiplier > 1
                         ? ` (×${mReward.multiplier})`
-                        : ""}
+                        : ""}{" "}
+                      + objective bonuses in flight
                     </p>
                   </div>
                   <div className="text-right text-xs">

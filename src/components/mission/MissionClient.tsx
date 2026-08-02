@@ -16,9 +16,21 @@ import { encodeShare, touchCraftSim, upsertCraft } from "@/lib/storage";
 import { fetchLiveCrafts } from "@/lib/cloud-fleet";
 import type { Craft, LiveCraftMarker } from "@/lib/types";
 import { InlineSpinner } from "@/components/ui/LoadingScreen";
-import { claimLaunchReward } from "@/lib/economy";
+import {
+  claimLaunchReward,
+  claimObjectiveReward,
+} from "@/lib/economy";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
+import {
+  canScan,
+  getMissionBriefing,
+  loadObjectiveState,
+  performScan,
+  saveObjectiveState,
+  type CraftObjectiveState,
+  type ObjectiveContext,
+} from "@/lib/mission-objectives";
 
 type Focus = "system" | "craft" | PlanetId;
 
@@ -41,6 +53,9 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   const [others, setOthers] = useState<LiveCraftMarker[]>([]);
   const [liveLoading, setLiveLoading] = useState(false);
   const [rewardToast, setRewardToast] = useState<string | null>(null);
+  const [objState, setObjState] = useState<CraftObjectiveState>(() =>
+    loadObjectiveState(craft.id)
+  );
   const activeEvents = useMemo(() => getActiveSkyEvents(), []);
   const skin = getSkin(craft.skinId || wallet.equippedSkinId);
 
@@ -66,7 +81,6 @@ export function MissionClient({ craft, readOnly = false }: Props) {
     return () => clearInterval(id);
   }, [craft.id, craft.status, readOnly, simMs, syncContext]);
 
-  // Multiplayer: load other inflight craft
   useEffect(() => {
     if (!configured) return;
     let cancelled = false;
@@ -87,10 +101,8 @@ export function MissionClient({ craft, readOnly = false }: Props) {
     };
   }, [configured, craft.id]);
 
-  // Claim launch credits once
   useEffect(() => {
     if (readOnly || !craft.missionId || craft.status !== "inflight") return;
-    // Ensure skin on craft for map
     if (!craft.skinId && wallet.equippedSkinId) {
       upsertCraft(
         { ...craft, skinId: wallet.equippedSkinId },
@@ -100,7 +112,7 @@ export function MissionClient({ craft, readOnly = false }: Props) {
     const result = claimLaunchReward(craft.id, craft.missionId);
     void persistWallet(result.wallet);
     if (!result.alreadyClaimed && result.gained > 0) {
-      setRewardToast(`+✦ ${result.gained} credits for launch`);
+      setRewardToast(`+✦ ${result.gained} for launch — now chase objectives`);
       const t = window.setTimeout(() => setRewardToast(null), 5000);
       return () => clearTimeout(t);
     }
@@ -109,10 +121,64 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   const stats = useMemo(() => computeStats(craft.partIds), [craft.partIds]);
   const mission = MISSION_PROFILES.find((m) => m.id === craft.missionId);
   const orbit = craft.orbit;
+  const briefing = useMemo(
+    () => getMissionBriefing(craft.missionId),
+    [craft.missionId]
+  );
+
+  const ctx: ObjectiveContext | null = useMemo(() => {
+    if (!orbit || !craft.missionId) return null;
+    return {
+      missionId: craft.missionId,
+      orbit,
+      simMs,
+      launchMs,
+      scanCount: objState.scanCount,
+    };
+  }, [orbit, craft.missionId, simMs, launchMs, objState.scanCount]);
+
+  // Auto-detect newly completed objectives and pay rewards
+  useEffect(() => {
+    if (readOnly || !ctx) return;
+    let state = loadObjectiveState(craft.id);
+    let gainedTotal = 0;
+    let lastTitle = "";
+    for (const o of briefing.objectives) {
+      if (state.completedIds.includes(o.id)) continue;
+      if (o.complete(ctx)) {
+        state = {
+          ...state,
+          completedIds: [...state.completedIds, o.id],
+        };
+        const pay = claimObjectiveReward(craft.id, o.id, o.rewardCredits);
+        void persistWallet(pay.wallet);
+        if (!pay.alreadyClaimed) {
+          gainedTotal += pay.gained;
+          lastTitle = o.title;
+        }
+      }
+    }
+    if (gainedTotal > 0) {
+      saveObjectiveState(craft.id, state);
+      setObjState(state);
+      setRewardToast(`Goal complete: ${lastTitle} · +✦ ${gainedTotal}`);
+      const t = window.setTimeout(() => setRewardToast(null), 4500);
+      return () => clearTimeout(t);
+    }
+  }, [ctx, briefing.objectives, craft.id, readOnly, persistWallet]);
 
   const distanceAU = orbit ? heliocentricDistanceAU(orbit, simMs) : 0;
-  const missionDays = (simMs - launchMs) / (86400 * 1000);
+  const missionDaysVal = (simMs - launchMs) / (86400 * 1000);
   const orbitPeriod = orbit ? periodDays(orbit) : 0;
+  const scanReady = canScan(objState, simMs);
+
+  const onScan = () => {
+    if (readOnly) return;
+    const res = performScan(craft.id, simMs);
+    setObjState(res.state);
+    setRewardToast(res.message);
+    window.setTimeout(() => setRewardToast(null), 3000);
+  };
 
   const onShare = useCallback(async () => {
     const snapshot = { ...craft, lastSimMs: simMs };
@@ -134,7 +200,6 @@ export function MissionClient({ craft, readOnly = false }: Props) {
     } catch {
       // fall through
     }
-
     const token = encodeShare(snapshot);
     const url = `${window.location.origin}/share/${token}`;
     setShareUrl(url);
@@ -146,6 +211,10 @@ export function MissionClient({ craft, readOnly = false }: Props) {
       setCopied(false);
     }
   }, [craft, simMs]);
+
+  const doneCount = briefing.objectives.filter((o) =>
+    objState.completedIds.includes(o.id)
+  ).length;
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-slate-950 text-slate-100">
@@ -167,17 +236,6 @@ export function MissionClient({ craft, readOnly = false }: Props) {
         </div>
       )}
 
-      {activeEvents.length > 0 && !readOnly && (
-        <div className="absolute left-2 right-2 top-14 z-10 sm:left-auto sm:right-4 sm:top-16 sm:max-w-xs">
-          <div className="rounded-xl border border-emerald-400/30 bg-slate-950/80 px-3 py-2 text-[11px] text-emerald-100 backdrop-blur sm:text-xs">
-            <span className="font-semibold text-emerald-300">Sky event</span>
-            <span className="mt-0.5 block truncate">
-              {activeEvents.map((e) => e.name).join(" · ")}
-            </span>
-          </div>
-        </div>
-      )}
-
       <header className="relative z-10 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-950/75 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {!readOnly && (
@@ -193,34 +251,110 @@ export function MissionClient({ craft, readOnly = false }: Props) {
               {craft.name}
             </h1>
             <p className="truncate text-[11px] text-slate-400 sm:text-xs">
-              {mission?.name ?? "Mission"} ·{" "}
-              {orbit?.centralBody === "earth" ? "Geocentric" : "Heliocentric"}
-              {readOnly ? " · Shared" : ""}
-              {others.length > 0 ? ` · ${others.length} others in space` : ""}
+              {mission?.name ?? "Mission"} · Goals {doneCount}/
+              {briefing.objectives.length}
+              {others.length > 0 ? ` · ${others.length} others` : ""}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {liveLoading && <InlineSpinner />}
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() => void onShare()}
-              className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1.5 text-xs text-cyan-200 hover:bg-cyan-500/20 sm:px-3 sm:text-sm"
-            >
-              {copied ? "Copied" : "Share"}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={!scanReady}
+                onClick={onScan}
+                className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
+                title="Log science — advances scan objectives"
+              >
+                Science scan
+              </button>
+              <button
+                type="button"
+                onClick={() => void onShare()}
+                className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1.5 text-xs text-cyan-200 hover:bg-cyan-500/20 sm:px-3 sm:text-sm"
+              >
+                {copied ? "Copied" : "Share"}
+              </button>
+            </>
           )}
         </div>
       </header>
 
-      <div className="relative z-10 m-2 max-w-[min(100%,20rem)] space-y-2 sm:m-4 sm:max-w-xs sm:space-y-3">
+      <div className="relative z-10 m-2 flex max-h-[calc(100dvh-8rem)] max-w-[min(100%,22rem)] flex-col gap-2 overflow-y-auto sm:m-4 sm:max-w-sm sm:gap-3">
+        {/* Purpose — the thing that was missing */}
+        <div className="rounded-2xl border border-cyan-400/30 bg-gradient-to-b from-cyan-950/80 to-slate-950/90 p-3 backdrop-blur-md sm:p-4">
+          <h2 className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300 sm:text-xs">
+            Your mission
+          </h2>
+          <p className="mt-1.5 text-sm font-medium leading-snug text-white">
+            {briefing.purpose}
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-slate-400">
+            <span className="text-slate-300">Win: </span>
+            {briefing.winCondition}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            {briefing.howTo}
+          </p>
+        </div>
+
+        {/* Objectives checklist */}
+        <div className="rounded-2xl border border-white/10 bg-slate-950/85 p-3 backdrop-blur-md sm:p-4">
+          <h2 className="text-[10px] font-semibold uppercase tracking-wider text-amber-200 sm:text-xs">
+            Objectives · earn credits
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {briefing.objectives.map((o) => {
+              const prog = ctx ? o.progress(ctx) : 0;
+              const done = objState.completedIds.includes(o.id) || prog >= 1;
+              return (
+                <li key={o.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p
+                        className={`text-sm font-medium ${
+                          done ? "text-emerald-300" : "text-slate-100"
+                        }`}
+                      >
+                        {done ? "✓ " : ""}
+                        {o.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                        {o.why}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-amber-200/90">
+                      +✦ {o.rewardCredits}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        done ? "bg-emerald-400" : "bg-cyan-400"
+                      }`}
+                      style={{ width: `${Math.round(prog * 100)}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {doneCount === briefing.objectives.length && (
+            <p className="mt-3 text-xs font-medium text-emerald-300">
+              Mission goals complete — design a bigger ship or chase a sky
+              event.
+            </p>
+          )}
+        </div>
+
         <div className="rounded-2xl border border-white/10 bg-slate-950/80 p-3 backdrop-blur-md sm:p-4">
           <h2 className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300 sm:text-xs">
             Telemetry
           </h2>
-          <dl className="mt-2 space-y-1.5 text-xs sm:mt-3 sm:space-y-2 sm:text-sm">
-            <Row label="Mission time" value={`${missionDays.toFixed(2)} d`} />
+          <dl className="mt-2 space-y-1.5 text-xs sm:text-sm">
+            <Row label="Mission time" value={`${missionDaysVal.toFixed(2)} d`} />
             <Row label="Heliocentric r" value={formatDistanceAU(distanceAU)} />
             <Row
               label="Orbit period"
@@ -230,6 +364,7 @@ export function MissionClient({ craft, readOnly = false }: Props) {
                   : `${orbitPeriod.toFixed(1)} d`
               }
             />
+            <Row label="Scans logged" value={String(objState.scanCount)} />
             <Row label="Ship Δv" value={formatDeltaV(stats.deltaVms)} />
             <Row label="Wet mass" value={formatMass(stats.wetMassKg)} />
           </dl>
@@ -265,13 +400,22 @@ export function MissionClient({ craft, readOnly = false }: Props) {
           </div>
         </div>
 
+        {activeEvents.length > 0 && !readOnly && (
+          <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-100">
+            <span className="font-semibold text-emerald-300">Sky event</span>
+            <span className="mt-0.5 block">
+              {activeEvents.map((e) => e.name).join(" · ")}
+            </span>
+          </div>
+        )}
+
         {others.length > 0 && (
-          <div className="hidden rounded-2xl border border-violet-400/20 bg-slate-950/80 p-3 backdrop-blur-md sm:block sm:p-4">
+          <div className="rounded-2xl border border-violet-400/20 bg-slate-950/80 p-3 backdrop-blur-md sm:p-4">
             <h2 className="text-[10px] font-semibold uppercase tracking-wider text-violet-300 sm:text-xs">
               Traffic ({others.length})
             </h2>
-            <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto text-xs text-slate-300">
-              {others.slice(0, 12).map((o) => (
+            <ul className="mt-2 max-h-24 space-y-1 overflow-y-auto text-xs text-slate-300">
+              {others.slice(0, 8).map((o) => (
                 <li key={o.id} className="truncate">
                   <span className="text-violet-200">{o.name}</span>
                   <span className="text-slate-500"> · {o.commanderName}</span>
@@ -302,7 +446,7 @@ export function MissionClient({ craft, readOnly = false }: Props) {
           </div>
           <div className="flex flex-wrap items-center gap-1">
             <span className="mr-1 text-[10px] text-slate-500 sm:text-xs">
-              Time
+              Time warp
             </span>
             {TIME_SCALES.map((t) => (
               <button
@@ -320,7 +464,7 @@ export function MissionClient({ craft, readOnly = false }: Props) {
             ))}
           </div>
           <p className="hidden text-xs text-slate-500 md:block">
-            Drag · zoom · other players appear as colored markers
+            Warp time → fill objective bars → earn credits
           </p>
         </div>
         {shareUrl && (
