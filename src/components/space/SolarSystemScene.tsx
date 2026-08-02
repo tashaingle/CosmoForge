@@ -9,10 +9,9 @@ import { craftScenePosition, type OrbitElements } from "@/lib/orbital";
 import type { LiveCraftMarker } from "@/lib/types";
 import { getSkin } from "@/lib/cosmetics";
 import {
-  AsteroidRocks,
-  BeltGuideRing,
   DeepStarfield,
   EclipticDust,
+  MainAsteroidBelt,
   ParticleCloud,
 } from "./SpaceEnvironment";
 import { EarthGlobe, preloadEarthTextures } from "./EarthGlobe";
@@ -439,55 +438,51 @@ export function SolarSystemScene({
       />
 
       <DeepStarfield />
-      <EclipticDust />
+      {/* Hide clutter when inspecting a planet up close */}
+      {!bodyClose && <EclipticDust />}
 
-      {/* ASTEROID BELT — deliberately bold so you notice it */}
-      <ParticleCloud
-        count={5000}
-        rMin={2.0}
-        rMax={3.4}
-        ySpread={0.1}
-        size={0.045}
-        color="#f5e6c8"
-        opacity={0.9}
-        seed={11}
-      />
-      <AsteroidRocks count={1200} rMin={2.05} rMax={3.35} seed={99} />
-      <BeltGuideRing />
+      {/* Main asteroid belt (between Mars ~1.5 AU and Jupiter ~5 AU) */}
+      <MainAsteroidBelt visible={!bodyClose || focusBodyId === "ceres"} />
 
-      {/* Inner dust */}
-      <ParticleCloud
-        count={1200}
-        rMin={0.5}
-        rMax={1.8}
-        ySpread={0.04}
-        size={0.03}
-        color="#fff1d6"
-        opacity={0.35}
-        seed={55}
-      />
-      {/* Trojans near Jupiter */}
-      <ParticleCloud
-        count={800}
-        rMin={4.8}
-        rMax={5.5}
-        ySpread={0.08}
-        size={0.03}
-        color="#e7d3b0"
-        opacity={0.5}
-        seed={33}
-      />
-      {/* Outer Kuiper — bigger points so visible at system scale */}
-      <ParticleCloud
-        count={2500}
-        rMin={30}
-        rMax={50}
-        ySpread={0.15}
-        size={0.12}
-        color="#cbd5e1"
-        opacity={0.5}
-        seed={44}
-      />
+      {/* Zodiacal / inner dust — very subtle */}
+      {!bodyClose && (
+        <ParticleCloud
+          count={800}
+          rMin={0.55}
+          rMax={1.7}
+          ySpread={0.03}
+          size={0.014}
+          color="#6b7280"
+          opacity={0.22}
+          seed={55}
+        />
+      )}
+      {/* Jupiter Trojans — gray dust clumps ahead/behind Jupiter's orbit */}
+      {!bodyClose && (
+        <ParticleCloud
+          count={600}
+          rMin={4.9}
+          rMax={5.4}
+          ySpread={0.05}
+          size={0.016}
+          color="#6b6560"
+          opacity={0.32}
+          seed={33}
+        />
+      )}
+      {/* Kuiper belt — soft distant haze, not big white squares */}
+      {!bodyClose && (
+        <ParticleCloud
+          count={1600}
+          rMin={32}
+          rMax={48}
+          ySpread={0.2}
+          size={0.06}
+          color="#94a3b8"
+          opacity={0.28}
+          seed={44}
+        />
+      )}
 
       {PLANETS.filter((p) => p.id !== "sun" && p.kind !== "moon").map((p) => (
         <OrbitRing
