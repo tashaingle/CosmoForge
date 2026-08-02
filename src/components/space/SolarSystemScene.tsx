@@ -2,19 +2,20 @@
 
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html, Line, OrbitControls, Stars } from "@react-three/drei";
+import { Html, Line, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import { MOONS, PLANETS, type BodyId } from "@/lib/bodies";
-import {
-  bodyPositionAU,
-  getBody,
-} from "@/lib/bodies";
-import {
-  craftScenePosition,
-  type OrbitElements,
-} from "@/lib/orbital";
+import { MOONS, PLANETS, type BodyId, getBody, bodyPositionAU } from "@/lib/bodies";
+import { craftScenePosition, type OrbitElements } from "@/lib/orbital";
 import type { LiveCraftMarker } from "@/lib/types";
 import { getSkin } from "@/lib/cosmetics";
+import {
+  AtmosphereShell,
+  DeepStarfield,
+  EclipticDust,
+  GasGiantSheen,
+  ParticleCloud,
+  SunGlow,
+} from "./SpaceEnvironment";
 
 interface SolarSystemSceneProps {
   simMs: number;
@@ -25,11 +26,19 @@ interface SolarSystemSceneProps {
   otherCrafts?: LiveCraftMarker[];
 }
 
-function OrbitRing({ radius, color }: { radius: number; color: string }) {
+function OrbitRing({
+  radius,
+  color,
+  opacity = 0.28,
+}: {
+  radius: number;
+  color: string;
+  opacity?: number;
+}) {
   const points = useMemo(() => {
     const pts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 128; i++) {
-      const t = (i / 128) * Math.PI * 2;
+    for (let i = 0; i <= 160; i++) {
+      const t = (i / 160) * Math.PI * 2;
       pts.push(new THREE.Vector3(Math.cos(t) * radius, 0, Math.sin(t) * radius));
     }
     return pts;
@@ -39,9 +48,9 @@ function OrbitRing({ radius, color }: { radius: number; color: string }) {
     <Line
       points={points}
       color={color}
-      lineWidth={0.5}
+      lineWidth={0.6}
       transparent
-      opacity={0.22}
+      opacity={opacity}
     />
   );
 }
@@ -61,35 +70,104 @@ function BodyMesh({
   const pos = bodyPositionAU(bodyId, simMs);
   const r = def.visualRadius * scale;
 
+  if (def.id === "sun") {
+    return (
+      <group position={[pos.x, pos.y, pos.z]}>
+        <mesh>
+          <sphereGeometry args={[r, 48, 48]} />
+          <meshStandardMaterial
+            color="#ffe566"
+            emissive="#ff9900"
+            emissiveIntensity={1.4}
+            roughness={0.35}
+            metalness={0.05}
+          />
+        </mesh>
+        <SunGlow />
+        {showLabel && (
+          <Html distanceFactor={14} style={{ pointerEvents: "none" }}>
+            <div className="whitespace-nowrap rounded border border-amber-400/30 bg-black/50 px-1.5 py-0.5 text-[10px] text-amber-100">
+              Sun
+            </div>
+          </Html>
+        )}
+      </group>
+    );
+  }
+
   return (
     <group position={[pos.x, pos.y, pos.z]}>
       <mesh>
-        <sphereGeometry args={[r, 28, 28]} />
+        <sphereGeometry args={[r, 36, 36]} />
         <meshStandardMaterial
           color={def.color}
-          emissive={def.emissive ?? "#000000"}
-          emissiveIntensity={def.id === "sun" ? 1.2 : 0.06}
-          roughness={0.55}
-          metalness={0.12}
+          emissive={def.color}
+          emissiveIntensity={0.08}
+          roughness={def.kind === "planet" && def.a > 4 ? 0.45 : 0.65}
+          metalness={def.kind === "dwarf" ? 0.25 : 0.1}
         />
       </mesh>
-      {def.id === "sun" && (
-        <pointLight color="#ffd27a" intensity={2.6} distance={90} decay={0.4} />
+
+      {/* Atmospheres / sheens */}
+      {def.id === "earth" && (
+        <AtmosphereShell radius={r} color="#60a5fa" intensity={0.4} />
+      )}
+      {def.id === "venus" && (
+        <AtmosphereShell radius={r} color="#fde68a" intensity={0.28} />
+      )}
+      {def.id === "mars" && (
+        <AtmosphereShell radius={r} color="#fb923c" intensity={0.15} />
+      )}
+      {def.id === "jupiter" && (
+        <GasGiantSheen radius={r} color="#f0c890" />
       )}
       {def.id === "saturn" && (
-        <mesh rotation={[Math.PI / 2.4, 0, 0.2]}>
-          <ringGeometry args={[r * 1.3, r * 2.15, 64]} />
+        <>
+          <GasGiantSheen radius={r} color="#f5e6c8" />
+          <mesh rotation={[Math.PI / 2.35, 0, 0.18]}>
+            <ringGeometry args={[r * 1.25, r * 2.2, 96]} />
+            <meshBasicMaterial
+              color="#e8d5a8"
+              side={THREE.DoubleSide}
+              transparent
+              opacity={0.65}
+              depthWrite={false}
+            />
+          </mesh>
+          <mesh rotation={[Math.PI / 2.35, 0, 0.18]}>
+            <ringGeometry args={[r * 1.55, r * 1.7, 64]} />
+            <meshBasicMaterial
+              color="#1e293b"
+              side={THREE.DoubleSide}
+              transparent
+              opacity={0.35}
+              depthWrite={false}
+            />
+          </mesh>
+        </>
+      )}
+      {def.id === "uranus" && (
+        <mesh rotation={[0.2, 0, Math.PI / 2.1]}>
+          <ringGeometry args={[r * 1.4, r * 1.85, 48]} />
           <meshBasicMaterial
-            color="#d4c4a0"
+            color="#a5f3fc"
             side={THREE.DoubleSide}
             transparent
-            opacity={0.55}
+            opacity={0.25}
+            depthWrite={false}
           />
         </mesh>
       )}
+      {def.id === "neptune" && (
+        <GasGiantSheen radius={r} color="#3b82f6" />
+      )}
+
       {showLabel && (
-        <Html distanceFactor={bodyId === "sun" ? 12 : 8} style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap rounded border border-white/10 bg-black/60 px-1.5 py-0.5 text-[10px] text-cyan-100">
+        <Html
+          distanceFactor={bodyId === "pluto" ? 10 : 7}
+          style={{ pointerEvents: "none" }}
+        >
+          <div className="whitespace-nowrap rounded border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10px] text-cyan-50 shadow">
             {def.name}
           </div>
         </Html>
@@ -124,7 +202,7 @@ function CraftMarker({
     ref.current.position.set(p.x, p.y, p.z);
     if (showTrail) {
       trail.current.push(new THREE.Vector3(p.x, p.y, p.z));
-      if (trail.current.length > 60) trail.current.shift();
+      if (trail.current.length > 70) trail.current.shift();
     }
   });
 
@@ -139,12 +217,18 @@ function CraftMarker({
           <meshStandardMaterial
             color="#f8fafc"
             emissive={color}
-            emissiveIntensity={0.9}
+            emissiveIntensity={1}
           />
         </mesh>
         <mesh>
-          <sphereGeometry args={[size * 2.2, 16, 16]} />
-          <meshBasicMaterial color={color} transparent opacity={0.15} />
+          <sphereGeometry args={[size * 2.4, 16, 16]} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.18}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
         </mesh>
         <Html distanceFactor={6} position={[size * 1.6, size * 2.2, 0]}>
           <div
@@ -168,7 +252,7 @@ function CraftMarker({
           color={color}
           lineWidth={1}
           transparent
-          opacity={0.4}
+          opacity={0.45}
         />
       )}
     </>
@@ -203,7 +287,7 @@ function CraftOrbitPreview({
       color="#67e8f9"
       lineWidth={1}
       transparent
-      opacity={0.35}
+      opacity={0.4}
     />
   );
 }
@@ -240,7 +324,7 @@ function CameraRig({
       enableDamping
       dampingFactor={0.08}
       minDistance={0.08}
-      maxDistance={80}
+      maxDistance={90}
       maxPolarAngle={Math.PI * 0.92}
     />
   );
@@ -248,10 +332,8 @@ function CameraRig({
 
 const OTHER_COLORS = ["#a78bfa", "#f472b6", "#fbbf24", "#34d399", "#60a5fa"];
 
-/** Show moons when focused on their parent, craft, system (major only), or the moon itself */
-function visibleMoons(focus: SolarSystemSceneProps["focus"]): typeof MOONS {
+function visibleMoons(focus: SolarSystemSceneProps["focus"]) {
   if (focus === "system") {
-    // Only big tour moons in system view
     return MOONS.filter((m) =>
       ["moon", "europa", "titan", "ganymede"].includes(m.id)
     );
@@ -263,7 +345,11 @@ function visibleMoons(focus: SolarSystemSceneProps["focus"]): typeof MOONS {
   }
   const body = getBody(focus);
   if (!body) return [];
-  if (body.kind === "moon") return MOONS.filter((m) => m.id === body.id || m.parentId === body.parentId);
+  if (body.kind === "moon") {
+    return MOONS.filter(
+      (m) => m.id === body.id || m.parentId === body.parentId
+    );
+  }
   return MOONS.filter((m) => m.parentId === focus);
 }
 
@@ -280,20 +366,78 @@ export function SolarSystemScene({
 
   return (
     <>
-      <color attach="background" args={["#020617"]} />
-      <ambientLight intensity={0.12} />
-      <Stars
-        radius={100}
-        depth={50}
-        count={5000}
-        factor={3}
-        saturation={0}
-        fade
-        speed={0.35}
+      <color attach="background" args={["#01040f"]} />
+      <fog attach="fog" args={["#01040f", 35, 95]} />
+      <ambientLight intensity={0.08} />
+      <hemisphereLight args={["#1e293b", "#020617", 0.35]} />
+
+      <DeepStarfield />
+      <EclipticDust />
+
+      {/* Main asteroid belt ~2.1–3.3 AU */}
+      <ParticleCloud
+        count={2800}
+        rMin={2.05}
+        rMax={3.35}
+        ySpread={0.035}
+        size={0.014}
+        color="#d6c4a8"
+        opacity={0.55}
+        seed={11}
+      />
+      {/* Inner belt / Hungarias hint */}
+      <ParticleCloud
+        count={600}
+        rMin={1.85}
+        rMax={2.1}
+        ySpread={0.02}
+        size={0.01}
+        color="#a8a29e"
+        opacity={0.35}
+        seed={22}
+      />
+      {/* Trojan-ish clumps near Jupiter orbit (simplified) */}
+      <ParticleCloud
+        count={400}
+        rMin={4.9}
+        rMax={5.4}
+        ySpread={0.05}
+        size={0.012}
+        color="#c4b5a0"
+        opacity={0.3}
+        seed={33}
+      />
+      {/* Kuiper belt hint */}
+      <ParticleCloud
+        count={1800}
+        rMin={32}
+        rMax={48}
+        ySpread={0.08}
+        size={0.04}
+        color="#94a3b8"
+        opacity={0.35}
+        seed={44}
+      />
+      {/* Zodiacal dust near sun */}
+      <ParticleCloud
+        count={500}
+        rMin={0.4}
+        rMax={1.6}
+        ySpread={0.015}
+        size={0.02}
+        color="#fff7ed"
+        opacity={0.12}
+        seed={55}
+        twinkle
       />
 
       {PLANETS.filter((p) => p.id !== "sun" && p.kind !== "moon").map((p) => (
-        <OrbitRing key={p.id} radius={p.a} color="#334155" />
+        <OrbitRing
+          key={`ring-${p.id}`}
+          radius={p.a}
+          color={p.a < 2 ? "#475569" : p.a < 10 ? "#334155" : "#1e293b"}
+          opacity={p.a < 5 ? 0.32 : 0.2}
+        />
       ))}
 
       {PLANETS.map((p) => (

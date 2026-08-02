@@ -29,9 +29,15 @@ export function SolarSystemCanvas({
   return (
     <div className={className ?? "h-full w-full"}>
       <Canvas
-        camera={{ position: [0, 2.2, 4.5], fov: 50, near: 0.01, far: 200 }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+        camera={{ position: [0, 2.8, 5.2], fov: 48, near: 0.01, far: 200 }}
+        dpr={[1, 1.75]}
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: "high-performance",
+          toneMapping: 4, // ACESFilmic
+          toneMappingExposure: 1.05,
+        }}
       >
         <Suspense fallback={null}>
           <SolarSystemScene
