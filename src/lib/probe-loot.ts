@@ -149,20 +149,25 @@ export interface PlayerCollection {
   /** lootId -> times catalogued */
   found: Record<string, number>;
   totalCreditsFromLoot: number;
+  /** debrief keys already paid out (craftId) */
+  claimedDebriefs?: string[];
+}
+
+function emptyCollection(): PlayerCollection {
+  return { version: 1, found: {}, totalCreditsFromLoot: 0, claimedDebriefs: [] };
 }
 
 export function loadCollection(): PlayerCollection {
-  if (typeof window === "undefined") {
-    return { version: 1, found: {}, totalCreditsFromLoot: 0 };
-  }
+  if (typeof window === "undefined") return emptyCollection();
   try {
     const raw = localStorage.getItem(COLLECTION_KEY);
-    if (!raw) return { version: 1, found: {}, totalCreditsFromLoot: 0 };
+    if (!raw) return emptyCollection();
     const p = JSON.parse(raw) as PlayerCollection;
-    if (p?.version !== 1) return { version: 1, found: {}, totalCreditsFromLoot: 0 };
+    if (p?.version !== 1) return emptyCollection();
+    if (!p.claimedDebriefs) p.claimedDebriefs = [];
     return p;
   } catch {
-    return { version: 1, found: {}, totalCreditsFromLoot: 0 };
+    return emptyCollection();
   }
 }
 
@@ -189,6 +194,35 @@ export function catalogueLoot(lootIds: LootId[]): {
   collection.totalCreditsFromLoot += credits;
   saveCollection(collection);
   return { collection, credits, newFinds };
+}
+
+/** Pay out a debrief once (re-reading won’t double credits) */
+export function catalogueDebriefOnce(
+  debriefKey: string,
+  lootIds: LootId[]
+): {
+  collection: PlayerCollection;
+  credits: number;
+  newFinds: LootId[];
+  alreadyClaimed: boolean;
+} {
+  const collection = loadCollection();
+  const claimed = collection.claimedDebriefs ?? [];
+  if (claimed.includes(debriefKey)) {
+    return {
+      collection,
+      credits: 0,
+      newFinds: [],
+      alreadyClaimed: true,
+    };
+  }
+  const result = catalogueLoot(lootIds);
+  result.collection.claimedDebriefs = [
+    ...(result.collection.claimedDebriefs ?? []),
+    debriefKey,
+  ];
+  saveCollection(result.collection);
+  return { ...result, alreadyClaimed: false };
 }
 
 export function collectionStats(c = loadCollection()) {

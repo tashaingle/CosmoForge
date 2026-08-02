@@ -15,6 +15,9 @@ import { MISSION_PROFILES } from "@/lib/orbital";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getPersonality } from "@/lib/probe-personality";
 import { voyageDurationMs } from "@/lib/probe-voyage";
+import { isPresetUnlocked, unlockHint } from "@/lib/probe-unlocks";
+import { loadCollection } from "@/lib/probe-loot";
+import { unlockedPresetCount } from "./unlock-stats";
 
 const ACCENT: Record<
   string,
@@ -38,12 +41,29 @@ const ACCENT: Record<
     btn: "bg-violet-500 hover:bg-violet-400 text-slate-950",
     tag: "text-violet-300",
   },
+  amber: {
+    border: "border-amber-400/30",
+    bg: "bg-amber-500/10",
+    btn: "bg-amber-500 hover:bg-amber-400 text-slate-950",
+    tag: "text-amber-300",
+  },
+  rose: {
+    border: "border-rose-400/30",
+    bg: "bg-rose-500/10",
+    btn: "bg-rose-500 hover:bg-rose-400 text-slate-950",
+    tag: "text-rose-300",
+  },
+  fuchsia: {
+    border: "border-fuchsia-400/30",
+    bg: "bg-fuchsia-500/10",
+    btn: "bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950",
+    tag: "text-fuchsia-300",
+  },
 };
 
 interface Props {
   syncContext: SyncContext;
   hasInflight: boolean;
-  /** Compact single recommended CTA */
   compact?: boolean;
 }
 
@@ -55,15 +75,26 @@ export function QuickLaunchPanel({
   const router = useRouter();
   const [busy, setBusy] = useState<PresetId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const collection = useMemo(() => {
+    void tick;
+    return loadCollection();
+  }, [tick]);
 
   const recommended = useMemo(
     () => pickRecommendedPreset(hasInflight),
-    [hasInflight]
+    [hasInflight, tick]
   );
   const active = useMemo(() => getActiveSkyEvents(), []);
+  const unlockStats = useMemo(() => unlockedPresetCount(collection), [collection]);
 
   async function onLaunch(id: PresetId) {
     setError(null);
+    if (!isPresetUnlocked(id, collection)) {
+      setError(unlockHint(id) ?? "Locked");
+      return;
+    }
     setBusy(id);
     try {
       const res = quickLaunch(id, syncContext);
@@ -72,6 +103,7 @@ export function QuickLaunchPanel({
         setBusy(null);
         return;
       }
+      setTick((t) => t + 1);
       router.push(`/mission/${res.craft.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Launch failed");
@@ -79,10 +111,17 @@ export function QuickLaunchPanel({
     }
   }
 
-  const recAccent = ACCENT[recommended.accent];
+  const recAccent = ACCENT[recommended.accent] ?? ACCENT.cyan;
   const recCheck = presetIsReady(recommended);
   const recMission = MISSION_PROFILES.find(
     (m) => m.id === recommended.missionId
+  );
+
+  const free = LAUNCH_PRESETS.filter((p) =>
+    ["leo_scout", "lunar_courier", "mars_probe"].includes(p.id)
+  );
+  const unlockable = LAUNCH_PRESETS.filter(
+    (p) => !["leo_scout", "lunar_courier", "mars_probe"].includes(p.id)
   );
 
   return (
@@ -105,8 +144,9 @@ export function QuickLaunchPanel({
           </p>
           <p className="mt-2 text-xs text-slate-500">
             {getPersonality(recommended.personalityId).label} ·{" "}
-            {recMission?.name} · ~{Math.round(voyageDurationMs(recommended.missionId) / 60000)}m
-            away · {formatDeltaV(recCheck.deltaVms)} Δv
+            {recMission?.name} · ~
+            {Math.round(voyageDurationMs(recommended.missionId) / 60000)}m away
+            · {formatDeltaV(recCheck.deltaVms)} Δv
           </p>
           <div className="mt-4">
             <button
@@ -124,59 +164,41 @@ export function QuickLaunchPanel({
       )}
 
       <div id="presets" className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold text-white">
-            {compact ? "Or pick an odd job" : "Personality launches"}
-          </h2>
-          <p className="text-sm text-slate-400">
-            Each probe gets a name and a voice. Travel is automatic — debrief is
-            the point.
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              {compact ? "Or pick an odd job" : "Personality launches"}
+            </h2>
+            <p className="text-sm text-slate-400">
+              {unlockStats.unlocked}/{unlockStats.total} flavors unlocked · bring
+              back finds to open more
+            </p>
+          </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {LAUNCH_PRESETS.map((p) => {
-            const a = ACCENT[p.accent];
-            const check = presetIsReady(p);
-            const mission = MISSION_PROFILES.find((m) => m.id === p.missionId);
-            const isRec = p.id === recommended.id;
-            const pers = getPersonality(p.personalityId);
-            return (
-              <div
-                key={p.id}
-                className={`flex flex-col rounded-2xl border p-4 ${a.border} bg-slate-900/60 ${
-                  isRec ? "ring-1 ring-cyan-400/40" : ""
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-white">{p.label}</h3>
-                  {isRec && (
-                    <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-cyan-200">
-                      Today
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
-                  {pers.label}
-                </p>
-                <p className="mt-1 flex-1 text-xs leading-relaxed text-slate-400">
-                  {p.blurb}
-                </p>
-                <p className="mt-2 text-[11px] text-slate-500">
-                  {mission?.name} · ~{Math.round(voyageDurationMs(p.missionId) / 60000)}m ·{" "}
-                  {formatDeltaV(check.deltaVms)}
-                </p>
-                <button
-                  type="button"
-                  disabled={!check.ok || busy !== null}
-                  onClick={() => void onLaunch(p.id)}
-                  className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${a.btn}`}
-                >
-                  {busy === p.id ? "Ignition…" : "Send them"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+
+        <PresetGrid
+          presets={free}
+          recommendedId={recommended.id}
+          busy={busy}
+          collectionTick={tick}
+          onLaunch={onLaunch}
+        />
+
+        {unlockable.length > 0 && (
+          <>
+            <h3 className="pt-2 text-sm font-semibold text-violet-200">
+              Unlocked by finds
+            </h3>
+            <PresetGrid
+              presets={unlockable}
+              recommendedId={recommended.id}
+              busy={busy}
+              collectionTick={tick}
+              onLaunch={onLaunch}
+              showLocks
+            />
+          </>
+        )}
       </div>
       {error && (
         <p className="text-sm text-rose-300" role="alert">
@@ -184,5 +206,88 @@ export function QuickLaunchPanel({
         </p>
       )}
     </section>
+  );
+}
+
+function PresetGrid({
+  presets,
+  recommendedId,
+  busy,
+  onLaunch,
+  showLocks = false,
+  collectionTick,
+}: {
+  presets: typeof LAUNCH_PRESETS;
+  recommendedId: PresetId;
+  busy: PresetId | null;
+  onLaunch: (id: PresetId) => void;
+  showLocks?: boolean;
+  collectionTick: number;
+}) {
+  void collectionTick;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {presets.map((p) => {
+        const a = ACCENT[p.accent] ?? ACCENT.cyan;
+        const unlocked = isPresetUnlocked(p.id);
+        const check = unlocked
+          ? presetIsReady(p)
+          : { ok: false, deltaVms: 0, minDeltaV: 0 };
+        const mission = MISSION_PROFILES.find((m) => m.id === p.missionId);
+        const isRec = p.id === recommendedId;
+        const pers = getPersonality(p.personalityId);
+        const hint = unlockHint(p.id);
+
+        return (
+          <div
+            key={p.id}
+            className={`flex flex-col rounded-2xl border p-4 ${
+              unlocked ? a.border : "border-white/10"
+            } ${unlocked ? "bg-slate-900/60" : "bg-slate-950/80 opacity-90"} ${
+              isRec && unlocked ? "ring-1 ring-cyan-400/40" : ""
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-semibold text-white">{p.label}</h3>
+              {!unlocked && showLocks && (
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase text-slate-400">
+                  Locked
+                </span>
+              )}
+              {isRec && unlocked && (
+                <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-cyan-200">
+                  Today
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
+              {pers.label}
+            </p>
+            <p className="mt-1 flex-1 text-xs leading-relaxed text-slate-400">
+              {unlocked ? p.blurb : hint}
+            </p>
+            <p className="mt-2 text-[11px] text-slate-500">
+              {mission?.name} · ~
+              {Math.round(voyageDurationMs(p.missionId) / 60000)}m
+              {unlocked ? ` · ${formatDeltaV(check.deltaVms)}` : ""}
+            </p>
+            <button
+              type="button"
+              disabled={!unlocked || !check.ok || busy !== null}
+              onClick={() => void onLaunch(p.id)}
+              className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                unlocked ? a.btn : "bg-white/10 text-slate-400"
+              }`}
+            >
+              {!unlocked
+                ? "Locked"
+                : busy === p.id
+                  ? "Ignition…"
+                  : "Send them"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }

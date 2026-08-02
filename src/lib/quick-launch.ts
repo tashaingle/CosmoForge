@@ -1,6 +1,6 @@
 /**
  * One-tap launches: personality flavors + preset stacks.
- * Little ships with big personalities.
+ * Some flavors unlock via loot finds.
  */
 
 import { nanoid } from "nanoid";
@@ -22,8 +22,20 @@ import {
   type PersonalityId,
 } from "./probe-personality";
 import { voyageDurationMs } from "./probe-voyage";
+import { isPresetUnlocked } from "./probe-unlocks";
 
-export type PresetId = "leo_scout" | "lunar_courier" | "mars_probe";
+export type PresetId =
+  | "leo_scout"
+  | "lunar_courier"
+  | "mars_probe"
+  | "grumpy_leo"
+  | "chipper_leo"
+  | "poet_lunar"
+  | "chaotic_event"
+  | "venus_obsessed"
+  | "void_listener"
+  | "lucky_bolt_run"
+  | "emotional_support";
 
 export interface LaunchPreset {
   id: PresetId;
@@ -32,13 +44,52 @@ export interface LaunchPreset {
   blurb: string;
   missionId: MissionProfileId;
   partIds: string[];
-  accent: "emerald" | "cyan" | "violet";
-  /** Default personality flavor for this odd job */
+  accent: "emerald" | "cyan" | "violet" | "amber" | "rose" | "fuchsia";
   personalityId: PersonalityId;
   flavorTitle: string;
 }
 
-/** Guaranteed launch-ready stacks with personality. */
+const LEO_PARTS = [
+  "bus_cubesat",
+  "solar_small",
+  "chem_small",
+  "tank_s",
+  "camera",
+  "antenna_s",
+];
+
+const LUNAR_PARTS = [
+  "bus_probe",
+  "solar_large",
+  "chem_main",
+  "tank_m",
+  "tank_s",
+  "camera",
+  "antenna_s",
+];
+
+const MARS_PARTS = [
+  "bus_probe",
+  "solar_large",
+  "chem_main",
+  "tank_l",
+  "tank_m",
+  "tank_s",
+  "spectrometer",
+  "hga",
+];
+
+const VENUS_PARTS = [
+  "bus_probe",
+  "solar_large",
+  "chem_main",
+  "tank_l",
+  "tank_m",
+  "spectrometer",
+  "hga",
+];
+
+/** Free + unlockable personality launches */
 export const LAUNCH_PRESETS: LaunchPreset[] = [
   {
     id: "leo_scout",
@@ -49,14 +100,7 @@ export const LAUNCH_PRESETS: LaunchPreset[] = [
       "A short LEO job for a probe that triple-checks everything. Back soon with feelings and data.",
     missionId: "leo",
     personalityId: "anxious",
-    partIds: [
-      "bus_cubesat",
-      "solar_small",
-      "chem_small",
-      "tank_s",
-      "camera",
-      "antenna_s",
-    ],
+    partIds: LEO_PARTS,
     accent: "emerald",
   },
   {
@@ -68,15 +112,7 @@ export const LAUNCH_PRESETS: LaunchPreset[] = [
       "Climb toward the Moon like it owes them rent. Expect monologues. Expect photos.",
     missionId: "lunar",
     personalityId: "dramatic",
-    partIds: [
-      "bus_probe",
-      "solar_large",
-      "chem_main",
-      "tank_m",
-      "tank_s",
-      "camera",
-      "antenna_s",
-    ],
+    partIds: LUNAR_PARTS,
     accent: "cyan",
   },
   {
@@ -88,17 +124,113 @@ export const LAUNCH_PRESETS: LaunchPreset[] = [
       "A long haul toward Mars. They’ll ping. Meaning optional. Souvenirs probable.",
     missionId: "mars_transfer",
     personalityId: "existential",
+    partIds: MARS_PARTS,
+    accent: "violet",
+  },
+  {
+    id: "grumpy_leo",
+    label: "Grumpy systems check",
+    craftName: "GrumpSat",
+    flavorTitle: "Unpaid intern in orbit",
+    blurb:
+      "Did not ask to be launched. Will complete checkout anyway. Coffee not included.",
+    missionId: "leo",
+    personalityId: "grumpy",
+    partIds: LEO_PARTS,
+    accent: "amber",
+  },
+  {
+    id: "chipper_leo",
+    label: "Chipper photo pass",
+    craftName: "Spark",
+    flavorTitle: "Unreasonably okay with vacuum",
+    blurb: "Heart emojis as telemetry. Will get the shot. Will say hi to Earth.",
+    missionId: "leo",
+    personalityId: "chipper",
+    partIds: [...LEO_PARTS, "camera"],
+    accent: "fuchsia",
+  },
+  {
+    id: "poet_lunar",
+    label: "Poet toward the Moon",
+    craftName: "Verse",
+    flavorTitle: "Lyrical transfer",
+    blurb:
+      "Telemetry in metaphor. Occasionally useful. Always a little beautiful.",
+    missionId: "lunar",
+    personalityId: "poet",
+    partIds: LUNAR_PARTS,
+    accent: "cyan",
+  },
+  {
+    id: "chaotic_event",
+    label: "Chaotic belt scout",
+    craftName: "Maybe",
+    flavorTitle: "Science via improvisation",
+    blurb:
+      "Safety margins are a suggestion. Ion-sipping toward the belt. lol.",
+    missionId: "asteroid_belt",
+    personalityId: "chaotic",
     partIds: [
       "bus_probe",
       "solar_large",
-      "chem_main",
+      "solar_large",
+      "ion_drive",
+      "tank_l",
       "tank_l",
       "tank_m",
-      "tank_s",
       "spectrometer",
       "hga",
     ],
+    accent: "rose",
+  },
+  {
+    id: "venus_obsessed",
+    label: "Venus essay run",
+    craftName: "Crush",
+    flavorTitle: "Unauthorized planetary thesis",
+    blurb:
+      "They will write about Venus. You cannot stop them. You can only fund them.",
+    missionId: "venus_flyby",
+    personalityId: "dramatic",
+    partIds: VENUS_PARTS,
+    accent: "amber",
+  },
+  {
+    id: "void_listener",
+    label: "Void listener",
+    craftName: "Hush",
+    flavorTitle: "Cursed quiet cruise",
+    blurb:
+      "For probes that met a friend-shaped void and came back quieter.",
+    missionId: "mars_transfer",
+    personalityId: "existential",
+    partIds: MARS_PARTS,
     accent: "violet",
+  },
+  {
+    id: "lucky_bolt_run",
+    label: "Lucky bolt run",
+    craftName: "Clutch",
+    flavorTitle: "Suspiciously fine LEO",
+    blurb:
+      "Something should fall off. It won’t. Bring the bolt home again.",
+    missionId: "leo",
+    personalityId: "chipper",
+    partIds: LEO_PARTS,
+    accent: "emerald",
+  },
+  {
+    id: "emotional_support",
+    label: "Emotional support probe",
+    craftName: "Softly",
+    flavorTitle: "Feelings optional (not really)",
+    blurb:
+      "HR-adjacent science. Returns with data and unscheduled emotion.",
+    missionId: "lunar",
+    personalityId: "anxious",
+    partIds: LUNAR_PARTS,
+    accent: "fuchsia",
   },
 ];
 
@@ -110,16 +242,17 @@ export function pickRecommendedPreset(
   hasInflight: boolean,
   now = Date.now()
 ): LaunchPreset {
+  const freeOrUnlocked = LAUNCH_PRESETS.filter((p) => isPresetUnlocked(p.id));
   const active = getActiveSkyEvents(now);
   for (const ev of active) {
     for (const mid of ev.boostMissions) {
-      const preset = LAUNCH_PRESETS.find((p) => p.missionId === mid);
+      const preset = freeOrUnlocked.find((p) => p.missionId === mid);
       if (preset) return preset;
     }
   }
   if (!hasInflight) return getPreset("leo_scout");
   const day = Math.floor(now / 86400000);
-  return LAUNCH_PRESETS[day % LAUNCH_PRESETS.length];
+  return freeOrUnlocked[day % freeOrUnlocked.length] ?? getPreset("leo_scout");
 }
 
 export function presetIsReady(preset: LaunchPreset): {
@@ -128,6 +261,14 @@ export function presetIsReady(preset: LaunchPreset): {
   minDeltaV: number;
   reason?: string;
 } {
+  if (!isPresetUnlocked(preset.id)) {
+    return {
+      ok: false,
+      deltaVms: 0,
+      minDeltaV: 0,
+      reason: "Locked — bring back the right find",
+    };
+  }
   const stats = computeStats(preset.partIds);
   const mission = MISSION_PROFILES.find((m) => m.id === preset.missionId);
   const minDeltaV = mission?.minDeltaV ?? 0;
@@ -171,15 +312,15 @@ export interface QuickLaunchResult {
   error?: string;
 }
 
-/**
- * Create a character-probe and launch it.
- */
 export function quickLaunch(
   presetId: PresetId,
   sync?: SyncContext,
   options?: { name?: string; personalityId?: PersonalityId }
 ): QuickLaunchResult {
   const preset = getPreset(presetId);
+  if (!isPresetUnlocked(presetId)) {
+    return { ok: false, error: "That odd job is still locked." };
+  }
   const check = presetIsReady(preset);
   if (!check.ok) {
     return { ok: false, error: check.reason ?? "Preset not ready" };
@@ -190,8 +331,7 @@ export function quickLaunch(
   const seed = Math.floor(Math.random() * 1e9);
   const personalityId = options?.personalityId ?? preset.personalityId;
   const personality = getPersonality(personalityId);
-  const name =
-    options?.name?.trim() || generateProbeName(seed);
+  const name = options?.name?.trim() || generateProbeName(seed);
 
   const craft: Craft = {
     id: nanoid(10),
@@ -216,12 +356,12 @@ export function quickLaunch(
     return { ok: false, error: "Launch failed — check design requirements." };
   }
 
-  // Ensure voyage timing + first ping flavor
   const withVoyage: Craft = {
     ...launched,
     personalityId,
     personalityVibe: personality.vibe,
-    expectedReturnAt: (launched.launchedAt ?? now) + voyageDurationMs(preset.missionId),
+    expectedReturnAt:
+      (launched.launchedAt ?? now) + voyageDurationMs(preset.missionId),
     pings: [
       {
         id: "depart",
