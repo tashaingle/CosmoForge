@@ -10,15 +10,20 @@ import type { LiveCraftMarker } from "@/lib/types";
 import { getSkin } from "@/lib/cosmetics";
 import {
   AsteroidRocks,
-  AtmosphereShell,
   BeltGuideRing,
   DeepStarfield,
   EclipticDust,
-  GasGiantSheen,
   ParticleCloud,
-  SunGlow,
 } from "./SpaceEnvironment";
 import { EarthGlobe, preloadEarthTextures } from "./EarthGlobe";
+import {
+  TexturedCelestial,
+  preloadBodyTextures,
+} from "./TexturedCelestial";
+import {
+  allBodyTextureUrls,
+  getBodyVisual,
+} from "@/lib/body-visuals";
 
 interface SolarSystemSceneProps {
   simMs: number;
@@ -63,127 +68,68 @@ function BodyMesh({
   simMs,
   showLabel,
   scale = 1,
-  earthBoost = false,
+  closeBoost = false,
 }: {
   bodyId: BodyId;
   simMs: number;
   showLabel: boolean;
   scale?: number;
-  /** Slightly larger Earth when camera is close (Google Earth framing) */
-  earthBoost?: boolean;
+  /** Slightly larger when camera is focused on this body */
+  closeBoost?: boolean;
 }) {
   const def = getBody(bodyId)!;
   const pos = bodyPositionAU(bodyId, simMs);
-  const r = def.visualRadius * scale;
+  const r = def.visualRadius * scale * (closeBoost ? 1.35 : 1);
+  const sun = bodyPositionAU("sun", simMs);
+  const sunPos: [number, number, number] = [sun.x, sun.y, sun.z];
+  const position: [number, number, number] = [pos.x, pos.y, pos.z];
 
-  if (def.id === "sun") {
-    return (
-      <group position={[pos.x, pos.y, pos.z]}>
-        <mesh>
-          <sphereGeometry args={[r, 48, 48]} />
-          <meshStandardMaterial
-            color="#ffe566"
-            emissive="#ff9900"
-            emissiveIntensity={1.4}
-            roughness={0.35}
-            metalness={0.05}
-          />
-        </mesh>
-        <SunGlow />
-        {showLabel && (
-          <Html distanceFactor={14} style={{ pointerEvents: "none" }}>
-            <div className="whitespace-nowrap rounded border border-amber-400/30 bg-black/50 px-1.5 py-0.5 text-[10px] text-amber-100">
-              Sun
-            </div>
-          </Html>
-        )}
-      </group>
-    );
-  }
-
+  // Earth keeps the full day/night/clouds treatment
   if (def.id === "earth") {
-    const sun = bodyPositionAU("sun", simMs);
-    const er = r * (earthBoost ? 1.35 : 1);
     return (
       <EarthGlobe
-        radius={er}
-        position={[pos.x, pos.y, pos.z]}
-        sunPosition={[sun.x, sun.y, sun.z]}
+        radius={r}
+        position={position}
+        sunPosition={sunPos}
         showLabel={showLabel}
         simMs={simMs}
       />
     );
   }
 
+  const visual = getBodyVisual(bodyId);
+  if (visual?.map) {
+    return (
+      <TexturedCelestial
+        radius={r}
+        position={position}
+        sunPosition={sunPos}
+        visual={visual}
+        label={def.name}
+        showLabel={showLabel}
+        simMs={simMs}
+        segments={
+          def.kind === "moon" ? 48 : def.id === "sun" ? 48 : 72
+        }
+      />
+    );
+  }
+
+  // Fallback solid (shouldn't hit for catalog bodies)
   return (
-    <group position={[pos.x, pos.y, pos.z]}>
+    <group position={position}>
       <mesh>
         <sphereGeometry args={[r, 36, 36]} />
         <meshStandardMaterial
           color={def.color}
           emissive={def.color}
           emissiveIntensity={0.08}
-          roughness={def.kind === "planet" && def.a > 4 ? 0.45 : 0.65}
-          metalness={def.kind === "dwarf" ? 0.25 : 0.1}
+          roughness={0.7}
+          metalness={0.1}
         />
       </mesh>
-
-      {/* Atmospheres / sheens */}
-      {def.id === "venus" && (
-        <AtmosphereShell radius={r} color="#fde68a" intensity={0.28} />
-      )}
-      {def.id === "mars" && (
-        <AtmosphereShell radius={r} color="#fb923c" intensity={0.15} />
-      )}
-      {def.id === "jupiter" && (
-        <GasGiantSheen radius={r} color="#f0c890" />
-      )}
-      {def.id === "saturn" && (
-        <>
-          <GasGiantSheen radius={r} color="#f5e6c8" />
-          <mesh rotation={[Math.PI / 2.35, 0, 0.18]}>
-            <ringGeometry args={[r * 1.25, r * 2.2, 96]} />
-            <meshBasicMaterial
-              color="#e8d5a8"
-              side={THREE.DoubleSide}
-              transparent
-              opacity={0.65}
-              depthWrite={false}
-            />
-          </mesh>
-          <mesh rotation={[Math.PI / 2.35, 0, 0.18]}>
-            <ringGeometry args={[r * 1.55, r * 1.7, 64]} />
-            <meshBasicMaterial
-              color="#1e293b"
-              side={THREE.DoubleSide}
-              transparent
-              opacity={0.35}
-              depthWrite={false}
-            />
-          </mesh>
-        </>
-      )}
-      {def.id === "uranus" && (
-        <mesh rotation={[0.2, 0, Math.PI / 2.1]}>
-          <ringGeometry args={[r * 1.4, r * 1.85, 48]} />
-          <meshBasicMaterial
-            color="#a5f3fc"
-            side={THREE.DoubleSide}
-            transparent
-            opacity={0.25}
-            depthWrite={false}
-          />
-        </mesh>
-      )}
-      {def.id === "neptune" && (
-        <GasGiantSheen radius={r} color="#3b82f6" />
-      )}
-
       {showLabel && (
-        <Html
-          distanceFactor={bodyId === "pluto" ? 10 : 7}
-          style={{ pointerEvents: "none" }}
-        >
+        <Html distanceFactor={7} style={{ pointerEvents: "none" }}>
           <div className="whitespace-nowrap rounded border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10px] text-cyan-50 shadow">
             {def.name}
           </div>
@@ -309,13 +255,32 @@ function CraftOrbitPreview({
   );
 }
 
-function isEarthCloseFocus(
+function isBodyCloseFocus(
   focus: SolarSystemSceneProps["focus"],
   craftOrbit?: OrbitElements | null
 ): boolean {
-  if (focus === "earth" || focus === "moon") return true;
-  if (focus === "craft" && craftOrbit?.centralBody === "earth") return true;
-  return false;
+  if (focus === "system") return false;
+  if (focus === "craft") {
+    return craftOrbit?.centralBody === "earth";
+  }
+  return true; // any planet/moon focus
+}
+
+function desiredCloseDistance(
+  focus: SolarSystemSceneProps["focus"],
+  craftOrbit?: OrbitElements | null
+): number {
+  if (focus === "craft" && craftOrbit?.centralBody === "earth") return 0.14;
+  if (focus === "earth" || focus === "moon") return 0.11;
+  if (focus === "mars" || focus === "venus" || focus === "mercury") return 0.1;
+  if (focus === "jupiter" || focus === "saturn") return 0.22;
+  if (focus === "uranus" || focus === "neptune") return 0.16;
+  if (typeof focus === "string" && focus !== "system" && focus !== "craft") {
+    const b = getBody(focus);
+    if (b?.kind === "moon") return 0.08;
+    if (b?.kind === "dwarf") return 0.09;
+  }
+  return 0.14;
 }
 
 function CameraRig({
@@ -330,7 +295,7 @@ function CameraRig({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controls = useRef<any>(null);
   const { camera } = useThree();
-  const earthClose = isEarthCloseFocus(focus, craftOrbit);
+  const bodyClose = isBodyCloseFocus(focus, craftOrbit);
 
   useFrame(() => {
     const c = controls.current;
@@ -345,16 +310,15 @@ function CameraRig({
     }
     c.target.lerp(target, 0.08);
 
-    // Google Earth–style framing: pull in when Earth / LEO / Moon
-    if (earthClose) {
-      c.minDistance = 0.045;
-      c.maxDistance = 1.2;
-      c.maxPolarAngle = Math.PI * 0.88;
+    // Close framing for planet/moon inspection (Google Earth–style)
+    if (bodyClose) {
+      c.minDistance = 0.04;
+      c.maxDistance = 3.5;
+      c.maxPolarAngle = Math.PI * 0.9;
       const offset = camera.position.clone().sub(c.target as THREE.Vector3);
       const dist = offset.length();
-      const desired =
-        focus === "earth" ? 0.11 : focus === "moon" ? 0.09 : 0.14;
-      if (dist > desired * 2.2 || dist < 0.02) {
+      const desired = desiredCloseDistance(focus, craftOrbit);
+      if (dist > desired * 2.5 || dist < 0.02) {
         const next = THREE.MathUtils.lerp(dist, desired, 0.06);
         if (offset.lengthSq() < 1e-8) {
           offset.set(0.08, 0.05, 0.1);
@@ -373,11 +337,11 @@ function CameraRig({
     <OrbitControls
       ref={controls}
       enableDamping
-      dampingFactor={earthClose ? 0.1 : 0.08}
-      minDistance={earthClose ? 0.045 : 0.08}
-      maxDistance={earthClose ? 1.2 : 90}
+      dampingFactor={bodyClose ? 0.1 : 0.08}
+      minDistance={bodyClose ? 0.04 : 0.08}
+      maxDistance={bodyClose ? 3.5 : 90}
       maxPolarAngle={Math.PI * 0.92}
-      rotateSpeed={earthClose ? 0.55 : 0.8}
+      rotateSpeed={bodyClose ? 0.55 : 0.8}
     />
   );
 }
@@ -415,20 +379,23 @@ export function SolarSystemScene({
 }: SolarSystemSceneProps) {
   const playerColor = getSkin(craftSkinId).color;
   const moons = visibleMoons(focus);
-  const earthClose = isEarthCloseFocus(focus, craftOrbit);
+  const bodyClose = isBodyCloseFocus(focus, craftOrbit);
+  const focusBodyId =
+    focus !== "system" && focus !== "craft" ? focus : null;
 
   useEffect(() => {
     preloadEarthTextures();
+    preloadBodyTextures(allBodyTextureUrls());
   }, []);
 
   return (
     <>
       <color attach="background" args={["#01040f"]} />
       <fog attach="fog" args={["#01040f", 35, 95]} />
-      {/* Dimmer ambient so Earth day/night terminator reads */}
-      <ambientLight intensity={earthClose ? 0.04 : 0.08} />
+      {/* Dimmer ambient so textured day/night terminators read */}
+      <ambientLight intensity={bodyClose ? 0.04 : 0.08} />
       <hemisphereLight
-        args={["#1e293b", "#020617", earthClose ? 0.2 : 0.35]}
+        args={["#1e293b", "#020617", bodyClose ? 0.2 : 0.35]}
       />
 
       <DeepStarfield />
@@ -497,7 +464,7 @@ export function SolarSystemScene({
           bodyId={p.id}
           simMs={simMs}
           showLabel={p.id !== "sun"}
-          earthBoost={earthClose && p.id === "earth"}
+          closeBoost={bodyClose && focusBodyId === p.id}
         />
       ))}
 
@@ -508,6 +475,7 @@ export function SolarSystemScene({
           simMs={simMs}
           showLabel
           scale={focus === m.parentId || focus === m.id ? 1.15 : 0.9}
+          closeBoost={focusBodyId === m.id}
         />
       ))}
 
