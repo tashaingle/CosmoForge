@@ -53,9 +53,11 @@ Open [http://localhost:3000](http://localhost:3000).
 | Share (URL snapshot or Supabase short link) | ✅ |
 | Other players’ craft on the map | ✅ |
 | Landing polish + mobile layout | ✅ |
-| Sky events (real calendar windows) | ✅ |
+| Sky events (catalog calendar) | ✅ |
+| Live JPL CAD + NASA DONKI feed | ✅ |
 | Credits economy + cosmetics shop | ✅ |
-| AI co-pilot / AR / JPL live ephemeris | ⏳ |
+| Player marketplace (25% take-rate) | ✅ |
+| AI co-pilot / AR | ⏳ |
 
 ## How to play
 

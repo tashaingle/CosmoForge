@@ -172,4 +172,200 @@ create policy "Users insert own profile"
 
 comment on table public.crafts is 'Player spacecraft designs and flight state';
 comment on table public.mission_shares is 'Public shareable mission snapshots';
-comment on table public.profiles is 'Commander display names';
+comment on table public.profiles is 'Commander display names + wallet';
+
+-- ── Marketplace (25% platform take-rate) ────────────────────────────
+create table if not exists public.market_listings (
+  id text primary key,
+  seller_id uuid not null references auth.users (id) on delete cascade,
+  seller_name text,
+  item_type text not null check (item_type in ('skin', 'blueprint')),
+  item_id text not null,
+  title text not null,
+  description text default '',
+  price_credits integer not null check (price_credits >= 10),
+  payload jsonb,
+  status text not null default 'active'
+    check (status in ('active', 'sold', 'cancelled')),
+  buyer_id uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  sold_at timestamptz
+);
+
+create index if not exists market_listings_status_idx
+  on public.market_listings (status, created_at desc);
+create index if not exists market_listings_seller_idx
+  on public.market_listings (seller_id);
+
+create table if not exists public.market_sales (
+  id text primary key,
+  listing_id text not null references public.market_listings (id),
+  seller_id uuid not null,
+  buyer_id uuid not null,
+  price_credits integer not null,
+  take_rate numeric not null,
+  platform_fee integer not null,
+  seller_net integer not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.market_platform_ledger (
+  id bigserial primary key,
+  listing_id text,
+  fee_credits integer not null,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.market_listings enable row level security;
+alter table public.market_sales enable row level security;
+alter table public.market_platform_ledger enable row level security;
+
+drop policy if exists "Anyone read active listings" on public.market_listings;
+create policy "Anyone read active listings"
+  on public.market_listings for select
+  using (true);
+
+drop policy if exists "Sellers insert listings" on public.market_listings;
+create policy "Sellers insert listings"
+  on public.market_listings for insert
+  with check (auth.uid() = seller_id);
+
+drop policy if exists "Sellers update own listings" on public.market_listings;
+create policy "Sellers update own listings"
+  on public.market_listings for update
+  using (auth.uid() = seller_id);
+
+drop policy if exists "Buyers read own sales" on public.market_sales;
+create policy "Buyers read own sales"
+  on public.market_sales for select
+  using (auth.uid() = buyer_id or auth.uid() = seller_id);
+
+-- No direct client writes to sales / ledger (RPC only)
+drop policy if exists "No client insert sales" on public.market_sales;
+
+-- Atomic purchase with 25% platform take-rate
+create or replace function public.market_purchase(p_listing_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_buyer uuid := auth.uid();
+  v_listing public.market_listings%rowtype;
+  v_buyer_credits integer;
+  v_seller_credits integer;
+  v_take numeric := 0.25;
+  v_fee integer;
+  v_net integer;
+  v_sale_id text;
+  v_skins text[];
+  v_new_craft_id text;
+begin
+  if v_buyer is null then
+    return jsonb_build_object('ok', false, 'error_message', 'Not signed in');
+  end if;
+
+  select * into v_listing
+  from public.market_listings
+  where id = p_listing_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'error_message', 'Listing not found');
+  end if;
+
+  if v_listing.status <> 'active' then
+    return jsonb_build_object('ok', false, 'error_message', 'Listing not active');
+  end if;
+
+  if v_listing.seller_id = v_buyer then
+    return jsonb_build_object('ok', false, 'error_message', 'Cannot buy your own listing');
+  end if;
+
+  select coalesce(credits, 0) into v_buyer_credits
+  from public.profiles where id = v_buyer for update;
+
+  if v_buyer_credits is null then
+    return jsonb_build_object('ok', false, 'error_message', 'Buyer profile missing');
+  end if;
+
+  if v_buyer_credits < v_listing.price_credits then
+    return jsonb_build_object('ok', false, 'error_message', 'Not enough credits');
+  end if;
+
+  v_fee := greatest(1, round(v_listing.price_credits * v_take)::integer);
+  v_net := v_listing.price_credits - v_fee;
+
+  update public.profiles
+  set credits = credits - v_listing.price_credits,
+      wallet_updated_at = now()
+  where id = v_buyer;
+
+  update public.profiles
+  set credits = coalesce(credits, 0) + v_net,
+      wallet_updated_at = now()
+  where id = v_listing.seller_id;
+
+  -- Grant item
+  if v_listing.item_type = 'skin' then
+    select unlocked_skin_ids into v_skins from public.profiles where id = v_buyer;
+    if v_skins is null then
+      v_skins := array[v_listing.item_id];
+    elsif not (v_listing.item_id = any (v_skins)) then
+      v_skins := array_append(v_skins, v_listing.item_id);
+    end if;
+    update public.profiles
+    set unlocked_skin_ids = v_skins
+    where id = v_buyer;
+  elsif v_listing.item_type = 'blueprint' then
+    v_new_craft_id := replace(gen_random_uuid()::text, '-', '');
+    insert into public.crafts (
+      id, user_id, name, part_ids, status, notes, skin_id, commander_name
+    ) values (
+      v_new_craft_id,
+      v_buyer,
+      coalesce(v_listing.payload->>'name', v_listing.title),
+      coalesce(
+        (select array_agg(x)::text[] from jsonb_array_elements_text(v_listing.payload->'partIds') as t(x)),
+        '{}'::text[]
+      ),
+      'design',
+      'Purchased blueprint from marketplace',
+      coalesce(v_listing.payload->>'skinId', 'default'),
+      (select display_name from public.profiles where id = v_buyer)
+    );
+  end if;
+
+  update public.market_listings
+  set status = 'sold',
+      buyer_id = v_buyer,
+      sold_at = now()
+  where id = p_listing_id;
+
+  v_sale_id := replace(gen_random_uuid()::text, '-', '');
+  insert into public.market_sales (
+    id, listing_id, seller_id, buyer_id, price_credits, take_rate, platform_fee, seller_net
+  ) values (
+    v_sale_id, p_listing_id, v_listing.seller_id, v_buyer,
+    v_listing.price_credits, v_take, v_fee, v_net
+  );
+
+  insert into public.market_platform_ledger (listing_id, fee_credits, note)
+  values (p_listing_id, v_fee, 'marketplace take-rate');
+
+  return jsonb_build_object(
+    'ok', true,
+    'price_credits', v_listing.price_credits,
+    'platform_fee', v_fee,
+    'seller_net', v_net,
+    'take_rate', v_take
+  );
+end;
+$$;
+
+grant execute on function public.market_purchase(text) to authenticated;
+grant execute on function public.market_purchase(text) to anon;
+
+comment on function public.market_purchase is 'Buy listing; 25% platform fee, 75% seller';

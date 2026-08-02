@@ -86,6 +86,27 @@ export function eventMissionBonus(missionId: MissionProfileId): number {
   return 0;
 }
 
+/** Optional live JPL/DONKI boost applied client-side after /api/sky-feed load */
+let liveBoost: {
+  multiplier: number;
+  bonusCredits: number;
+  labels: string[];
+} | null = null;
+
+export function setLiveRewardBoost(
+  boost: {
+    multiplier: number;
+    bonusCredits: number;
+    labels: string[];
+  } | null
+): void {
+  liveBoost = boost;
+}
+
+export function getLiveRewardBoost() {
+  return liveBoost;
+}
+
 export function computeLaunchReward(
   missionId: MissionProfileId,
   now = Date.now()
@@ -107,21 +128,31 @@ export function computeLaunchReward(
       e.eventMissionId === missionId ||
       missionId.startsWith("event_")
   );
-  const eventFlat =
+  let eventFlat =
     relevant.length > 0
       ? relevant.reduce((s, e) => s + e.bonusCredits, 0)
       : missionId.startsWith("event_")
         ? flat
         : 0;
-  const multApplied =
+  let multApplied =
     relevant.length > 0 || missionId.startsWith("event_") ? mult : 1;
+  const events = relevant.map((e) => e.name);
+
+  // Stack live JPL/DONKI activity (NEO approaches, flares)
+  if (liveBoost && liveBoost.multiplier > 1) {
+    multApplied = Math.max(multApplied, liveBoost.multiplier);
+    // Apply a portion of live flat bonus on any launch while live events active
+    eventFlat += Math.round(liveBoost.bonusCredits * 0.5);
+    events.push(...liveBoost.labels.slice(0, 3));
+  }
+
   const total = Math.round(base * multApplied + eventFlat);
   return {
     total,
     base,
     eventBonus: eventFlat,
     multiplier: multApplied,
-    events: relevant.map((e) => e.name),
+    events,
   };
 }
 

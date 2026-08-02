@@ -11,7 +11,20 @@ This adds:
 - RLS so **inflight crafts are publicly readable** (shared map)  
 - Owners still fully manage their own crafts  
 
-Re-run after updates for economy / cosmetics columns.
+Re-run after updates for economy / cosmetics / **marketplace** tables and `market_purchase` RPC.
+
+### Marketplace notes
+
+- Take-rate: **25%** platform fee (`market_purchase` function)
+- Tables: `market_listings`, `market_sales`, `market_platform_ledger`
+- Sellers list skins / blueprints; buyers pay full price; seller receives 75%
+
+### Live JPL / NASA feed
+
+No Supabase setup required. The app hits:
+
+- JPL CAD: `https://ssd-api.jpl.nasa.gov/cad.api` (NEO close approaches)
+- NASA DONKI: flares + CMEs (optional `NASA_API_KEY` env; else `DEMO_KEY`)
 
 ## 2. Auth redirect URLs
 

@@ -18,6 +18,7 @@ import { SiteHeader } from "@/components/ui/SiteHeader";
 import { LoadingScreen, InlineSpinner } from "@/components/ui/LoadingScreen";
 import { SkyEventsPanel } from "@/components/events/SkyEventsPanel";
 import { CosmeticsShop } from "@/components/shop/CosmeticsShop";
+import { MarketplacePanel } from "@/components/market/MarketplacePanel";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
 import type { PlayerWallet } from "@/lib/economy";
@@ -256,7 +257,7 @@ export function HangarClient() {
       >
         <SkyEventsPanel />
       </section>
-      <section id="shop" className="relative mx-auto max-w-6xl px-4 pb-12">
+      <section id="shop" className="relative mx-auto max-w-6xl px-4 pb-8">
         {(localWallet || wallet) && (
           <CosmeticsShop
             wallet={localWallet ?? wallet}
@@ -266,6 +267,9 @@ export function HangarClient() {
             }}
           />
         )}
+      </section>
+      <section id="market" className="relative mx-auto max-w-6xl px-4 pb-12">
+        <MarketplacePanel />
       </section>
 
       {/* Hangar */}

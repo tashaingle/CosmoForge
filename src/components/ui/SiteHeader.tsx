@@ -42,9 +42,15 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
             <a
               href="/#shop"
               className="rounded-lg border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold tabular-nums text-amber-200 hover:bg-amber-500/20 sm:px-2.5 sm:text-xs"
-              title="Credits"
+              title="Credits & shop"
             >
               ✦ {wallet.credits}
+            </a>
+            <a
+              href="/#market"
+              className="hidden rounded-lg border border-white/10 px-2 py-1 text-[11px] text-slate-300 hover:bg-white/5 sm:inline sm:text-xs"
+            >
+              Market
             </a>
             {cloudSyncing && (
               <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:flex">
