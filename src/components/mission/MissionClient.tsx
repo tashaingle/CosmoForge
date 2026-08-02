@@ -239,8 +239,9 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   ).length;
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col bg-slate-950 text-slate-100">
-      <div className="absolute inset-0">
+    <div className="relative h-[100dvh] overflow-hidden bg-slate-950 text-slate-100">
+      {/* 3D view fills the screen; UI is overlaid so the page never scrolls */}
+      <div className="absolute inset-0 z-0">
         <SolarSystemCanvas
           simMs={simMs}
           craftOrbit={orbit}
@@ -253,12 +254,12 @@ export function MissionClient({ craft, readOnly = false }: Props) {
       </div>
 
       {rewardToast && (
-        <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-full border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-100 shadow-lg backdrop-blur">
+        <div className="pointer-events-none absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-100 shadow-lg backdrop-blur">
           {rewardToast}
         </div>
       )}
 
-      <header className="relative z-10 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-950/75 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+      <header className="absolute left-0 right-0 top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-950/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {!readOnly && (
             <Link
@@ -305,7 +306,8 @@ export function MissionClient({ craft, readOnly = false }: Props) {
         </div>
       </header>
 
-      <div className="relative z-10 m-2 mb-[5.5rem] flex max-h-[calc(100dvh-10.5rem)] max-w-[min(100%,22rem)] flex-col gap-2 overflow-y-auto sm:m-4 sm:mb-28 sm:max-h-[calc(100dvh-11rem)] sm:max-w-sm sm:gap-3">
+      {/* Sidebar scrolls on its own; never pushes the time-warp bar off-screen */}
+      <div className="absolute bottom-[5.75rem] left-2 top-14 z-20 flex w-[min(calc(100%-1rem),22rem)] flex-col gap-2 overflow-y-auto overscroll-contain sm:bottom-24 sm:left-4 sm:top-16 sm:w-sm sm:gap-3">
         {/* Purpose — the thing that was missing */}
         <div className="rounded-2xl border border-cyan-400/30 bg-gradient-to-b from-cyan-950/80 to-slate-950/90 p-3 backdrop-blur-md sm:p-4">
           <h2 className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300 sm:text-xs">
@@ -472,8 +474,9 @@ export function MissionClient({ craft, readOnly = false }: Props) {
         )}
       </div>
 
-      <div className="pointer-events-none relative z-30 mt-auto shrink-0 pb-[env(safe-area-inset-bottom)]">
-        <div className="pointer-events-auto border-t border-cyan-400/25 bg-slate-950/95 px-3 py-3 shadow-[0_-8px_32px_rgba(0,0,0,0.65)] backdrop-blur-xl sm:px-4 sm:py-3.5">
+      {/* Always pinned to the bottom of the viewport */}
+      <div className="absolute inset-x-0 bottom-0 z-30 pb-[env(safe-area-inset-bottom)]">
+        <div className="border-t border-cyan-400/25 bg-slate-950/95 px-3 py-3 shadow-[0_-8px_32px_rgba(0,0,0,0.65)] backdrop-blur-xl sm:px-4 sm:py-3.5">
           <div className="mx-auto flex max-w-5xl flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
             <div className="flex items-center gap-2">
               <button
