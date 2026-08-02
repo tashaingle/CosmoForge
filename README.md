@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CosmoForge
 
-## Getting Started
+**Design, launch, and command spacecraft** in a persistent, real-ish solar system.
 
-First, run the development server:
+Web-first playable alpha: modular ship design → mission launch → 3D solar system with time acceleration → offline progress → shareable mission links.
+
+**Repo:** [github.com/tashaingle/CosmoForge](https://github.com/tashaingle/CosmoForge)
+
+## Quick start (local)
 
 ```bash
+npm install
+cp .env.example .env.local   # optional until Supabase is wired
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Import **tashaingle/CosmoForge** in the [Vercel dashboard](https://vercel.com/new).
+2. Framework preset: **Next.js** (auto-detected).
+3. Add environment variables (same as `.env.example`):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (optional; server-only)
+4. Deploy. Your app works **without** Supabase first (localStorage hangar + long share URLs). With Supabase, shares become short `/s/xxxxx` links.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Supabase setup
+
+1. Create a project in [Supabase](https://supabase.com).
+2. **SQL Editor** → paste and run [`supabase/schema.sql`](./supabase/schema.sql).
+3. **Project Settings → API** → copy Project URL + `anon` public key.
+4. Put them in `.env.local` (local) and Vercel env (production).
+
+### What the schema includes
+
+| Table | Purpose |
+|--------|---------|
+| `crafts` | Cloud fleet (auth-ready; hangar still uses localStorage in Alpha) |
+| `mission_shares` | Short public mission snapshots for `/s/[id]` |
+
+## What’s in the Alpha
+
+| Feature | Status |
+|--------|--------|
+| Hangar + fleet (localStorage) | ✅ |
+| Modular ship builder (mass, power, Δv) | ✅ |
+| Missions (LEO, lunar, Mars, belt) | ✅ |
+| 3D solar system + craft | ✅ |
+| Time acceleration + offline catch-up | ✅ |
+| Share (URL snapshot or Supabase short link) | ✅ |
+| Multiplayer / economy / AI co-pilot | ⏳ |
+| Live JPL ephemeris | ⏳ |
+| Auth-backed cloud hangar | ⏳ |
+| Mobile / AR | ⏳ |
+
+## How to play
+
+1. **New spacecraft** from the hangar  
+2. **Design** — bus, power, engine, tanks, payload  
+3. **Launch** — pick a mission your Δv supports  
+4. **Command** — time-warp, camera focus, telemetry  
+5. **Share** — copy a mission link  
+
+## Stack
+
+- **Next.js** (App Router) + TypeScript + Tailwind  
+- **React Three Fiber** + Drei  
+- **Supabase** (optional for short share links; required path for multiplayer next)  
+- **Vercel** for hosting  
+
+## Project layout
+
+```
+src/
+  app/                 # routes + API
+  components/          # hangar, builder, space, mission
+  lib/                 # orbital, ship, storage, supabase
+supabase/
+  schema.sql           # run once in Supabase SQL Editor
+```
+
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+```
+
+## Notes
+
+- Orbits are simplified (play-first Δv gates, Kepler craft, circular planets).  
+- Not affiliated with NASA/JPL.  
+- Share RLS is open for Alpha inserts — tighten before a public multiplayer launch.
