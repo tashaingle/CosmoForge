@@ -175,26 +175,127 @@ export function donkiFlaresToFeedItems(flares: any[]): LiveFeedItem[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function donkiCmesToFeedItems(cmes: any[]): LiveFeedItem[] {
-  return cmes.slice(0, 12).map((c, i) => {
-    const t = c.startTime || c.activityID;
-    const startMs = t ? Date.parse(String(t).slice(0, 19) + "Z") : Date.now();
-    const speed = c.cmeAnalyses?.[0]?.speed ?? c.speed;
-    return {
-      id: `donki_cme_${c.activityID || i}`,
-      source: "nasa_donki" as const,
-      name: "Coronal mass ejection",
-      kind: "cme" as const,
+  // DONKI often returns many analyses for the same event; keep the fastest per start hour
+  const byHour = new Map<string, LiveFeedItem>();
+
+  for (let i = 0; i < cmes.length; i++) {
+    const c = cmes[i];
+    const t = c.startTime || String(c.activityID || "").slice(0, 19);
+    let startMs = t ? Date.parse(String(t).includes("Z") ? t : `${String(t).slice(0, 19)}Z`) : NaN;
+    if (!Number.isFinite(startMs) && c.activityID) {
+      // activityID like "2026-08-02T12:00:00-CME-001"
+      const m = String(c.activityID).match(
+        /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
+      );
+      if (m) startMs = Date.parse(m[1] + "Z");
+    }
+    if (!Number.isFinite(startMs)) continue;
+
+    const analyses = Array.isArray(c.cmeAnalyses) ? c.cmeAnalyses : [];
+    const speed = Math.max(
+      0,
+      ...analyses.map((a: { speed?: number }) => Number(a.speed) || 0),
+      Number(c.speed) || 0
+    );
+    const hourKey = new Date(startMs).toISOString().slice(0, 13); // YYYY-MM-DDTHH
+    const existing = byHour.get(hourKey);
+    const existingSpeed = Number(existing?.meta?.speed) || 0;
+    if (existing && existingSpeed >= speed) continue;
+
+    const mult = speed >= 800 ? 1.4 : speed >= 500 ? 1.3 : 1.2;
+    const bonus = speed >= 800 ? 70 : speed >= 500 ? 50 : 35;
+
+    byHour.set(hourKey, {
+      id: `donki_cme_${hourKey}_${c.activityID || i}`,
+      source: "nasa_donki",
+      name: speed >= 500 ? "Fast CME" : "Coronal mass ejection",
+      kind: "cme",
       blurb: `NASA DONKI CME${
-        speed ? ` · model speed ~${Math.round(speed)} km/s` : ""
-      }. Watch for geomagnetic response.`,
-      startMs: Number.isFinite(startMs) ? startMs : Date.now(),
-      endMs: (Number.isFinite(startMs) ? startMs : Date.now()) + 3 * 86400_000,
-      rewardMultiplier: 1.25,
-      bonusCredits: 40,
-      boostMissions: ["leo", "event_storm_rider"] as MissionProfileId[],
+        speed ? ` · ~${Math.round(speed)} km/s model speed` : ""
+      }. Solar wind disturbance possible.`,
+      startMs,
+      // Short window so the feed isn't flooded for days
+      endMs: startMs + 36 * 3600_000,
+      rewardMultiplier: mult,
+      bonusCredits: bonus,
+      boostMissions: ["leo", "event_storm_rider"],
+      meta: { speed },
+      url: "https://kauai.ccmc.gsfc.nasa.gov/DONKI/",
+    });
+  }
+
+  return Array.from(byHour.values())
+    .sort((a, b) => (Number(b.meta?.speed) || 0) - (Number(a.meta?.speed) || 0))
+    .slice(0, 6);
+}
+
+function interestScore(item: LiveFeedItem): number {
+  let s = (item.rewardMultiplier ?? 1) * 100 + (item.bonusCredits ?? 0);
+  if (item.kind === "neo_approach") s += 200;
+  if (item.kind === "solar_flare") s += 80;
+  if (item.kind === "cme") s += 40;
+  return s;
+}
+
+/**
+ * Dedupe + rank for UI: NEOs first, cap CME spam, max N active-ish items.
+ */
+export function prepareFeedForDisplay(
+  items: LiveFeedItem[],
+  now = Date.now()
+): { active: LiveFeedItem[]; upcoming: LiveFeedItem[]; summary?: LiveFeedItem } {
+  const seen = new Set<string>();
+  const unique = items.filter((i) => {
+    const key =
+      i.kind === "cme"
+        ? `cme-${new Date(i.startMs).toISOString().slice(0, 13)}`
+        : i.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const activeRaw = unique.filter((i) => now >= i.startMs && now <= i.endMs);
+  const cmes = activeRaw.filter((i) => i.kind === "cme");
+  const nonCme = activeRaw.filter((i) => i.kind !== "cme");
+
+  // Collapse many active CMEs into one summary + keep the single strongest
+  let summary: LiveFeedItem | undefined;
+  let topCme: LiveFeedItem[] = [];
+  if (cmes.length > 1) {
+    const best = [...cmes].sort(
+      (a, b) => (Number(b.meta?.speed) || 0) - (Number(a.meta?.speed) || 0)
+    )[0];
+    topCme = [best];
+    const maxSpeed = Math.max(...cmes.map((c) => Number(c.meta?.speed) || 0));
+    summary = {
+      id: `cme_summary_${new Date(now).toISOString().slice(0, 10)}`,
+      source: "nasa_donki",
+      name: `Solar wind: ${cmes.length} CMEs in window`,
+      kind: "cme",
+      blurb: `NASA DONKI reports ${cmes.length} coronal mass ejections recently (fastest ~${Math.round(maxSpeed)} km/s). Grouped so the feed stays readable.`,
+      startMs: Math.min(...cmes.map((c) => c.startMs)),
+      endMs: Math.max(...cmes.map((c) => c.endMs)),
+      rewardMultiplier: best.rewardMultiplier,
+      bonusCredits: best.bonusCredits,
+      boostMissions: ["leo", "event_storm_rider"],
       url: "https://kauai.ccmc.gsfc.nasa.gov/DONKI/",
     };
-  });
+  } else {
+    topCme = cmes;
+  }
+
+  const active = [...nonCme, ...topCme]
+    .sort((a, b) => interestScore(b) - interestScore(a))
+    .slice(0, 6);
+
+  const upcoming = unique
+    .filter((i) => i.startMs > now)
+    .sort((a, b) => a.startMs - b.startMs || interestScore(b) - interestScore(a))
+    .filter((i) => i.kind !== "cme" || interestScore(i) > 100)
+    .slice(0, 6);
+
+  return { active, upcoming, summary };
 }
 
 /** Live items that overlap "now" for reward stacking with catalog. */
@@ -202,7 +303,7 @@ export function activeLiveItems(
   items: LiveFeedItem[],
   now = Date.now()
 ): LiveFeedItem[] {
-  return items.filter((i) => now >= i.startMs && now <= i.endMs);
+  return prepareFeedForDisplay(items, now).active;
 }
 
 export function liveRewardBoost(items: LiveFeedItem[], now = Date.now()): {
@@ -210,13 +311,19 @@ export function liveRewardBoost(items: LiveFeedItem[], now = Date.now()): {
   bonusCredits: number;
   labels: string[];
 } {
-  const active = activeLiveItems(items, now);
-  if (active.length === 0) {
+  // Use display-prepared set so 12 CMEs don't stack 12× flat bonuses
+  const { active, summary } = prepareFeedForDisplay(items, now);
+  const pool = summary ? [...active.filter((a) => a.kind !== "cme"), summary] : active;
+  if (pool.length === 0) {
     return { multiplier: 1, bonusCredits: 0, labels: [] };
   }
   return {
-    multiplier: Math.max(...active.map((a) => a.rewardMultiplier ?? 1)),
-    bonusCredits: active.reduce((s, a) => s + (a.bonusCredits ?? 0), 0),
-    labels: active.map((a) => a.name),
+    multiplier: Math.max(...pool.map((a) => a.rewardMultiplier ?? 1)),
+    // Cap stacked flat bonus so solar storms don't print free money
+    bonusCredits: Math.min(
+      150,
+      pool.reduce((s, a) => s + (a.bonusCredits ?? 0), 0)
+    ),
+    labels: pool.map((a) => a.name).slice(0, 4),
   };
 }

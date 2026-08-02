@@ -65,8 +65,9 @@ async function fetchNasaDonki(): Promise<{
   const key = process.env.NASA_API_KEY || "DEMO_KEY";
   try {
     const now = new Date();
-    const start = new Date(now.getTime() - 14 * 86400_000);
-    const end = new Date(now.getTime() + 2 * 86400_000);
+    // Shorter window = less CME noise in the UI
+    const start = new Date(now.getTime() - 3 * 86400_000);
+    const end = new Date(now.getTime() + 1 * 86400_000);
     const base = "https://api.nasa.gov/DONKI";
     const q = `startDate=${ymd(start)}&endDate=${ymd(end)}&api_key=${key}`;
 

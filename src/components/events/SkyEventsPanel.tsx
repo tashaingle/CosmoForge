@@ -8,7 +8,7 @@ import {
   getUpcomingSkyEvents,
 } from "@/lib/sky-events";
 import type { LiveFeedItem, SkyFeedResponse } from "@/lib/jpl-feed";
-import { activeLiveItems, liveRewardBoost } from "@/lib/jpl-feed";
+import { liveRewardBoost, prepareFeedForDisplay } from "@/lib/jpl-feed";
 import { setLiveRewardBoost } from "@/lib/economy";
 import { InlineSpinner } from "@/components/ui/LoadingScreen";
 
@@ -56,12 +56,16 @@ export function SkyEventsPanel() {
     };
   }, []);
 
-  const liveActive: LiveFeedItem[] = feed
-    ? activeLiveItems(feed.items)
-    : [];
-  const liveUpcoming = (feed?.items ?? [])
-    .filter((i) => i.startMs > Date.now())
-    .slice(0, 8);
+  const prepared = feed
+    ? prepareFeedForDisplay(feed.items)
+    : { active: [] as LiveFeedItem[], upcoming: [] as LiveFeedItem[] };
+  const liveActive = prepared.summary
+    ? [
+        ...prepared.active.filter((a) => a.kind !== "cme"),
+        prepared.summary,
+      ]
+    : prepared.active;
+  const liveUpcoming = prepared.upcoming;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4">
