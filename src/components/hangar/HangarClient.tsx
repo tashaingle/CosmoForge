@@ -26,6 +26,7 @@ import {
   FleetStatusPanel,
 } from "@/components/home/FleetStatusPanel";
 import { DailyQuestCompact } from "@/components/home/DailyQuestCompact";
+import { ProbeVoyagePanel } from "@/components/home/ProbeVoyagePanel";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
 import type { PlayerWallet } from "@/lib/economy";
@@ -149,21 +150,22 @@ export function HangarClient() {
       <SiteHeader />
 
       <main className="relative mx-auto max-w-6xl space-y-8 px-4 pb-16 pt-6 sm:pt-8">
-        {/* Hero — core fantasy, short */}
+        {/* Hero — little ships with big personalities */}
         <section className="space-y-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-400/90">
-              CosmoForge · Your ship is out there
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-violet-300/90">
+              CosmoForge · slightly unhinged mission control
             </p>
             <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
-              A probe in{" "}
-              <span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-400 bg-clip-text text-transparent">
-                today’s solar system
+              Little ships with{" "}
+              <span className="bg-gradient-to-r from-violet-300 via-cyan-300 to-amber-200 bg-clip-text text-transparent">
+                big personalities
               </span>
             </h1>
             <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-400 sm:text-lg">
-              Launch in one tap. Your craft keeps flying offline. Check in,
-              finish goals, share a mission link — design is optional.
+              You launch weird probes into a real-ish solar system. They fly
+              without you, send odd pings, come back changed — and the real game
+              is the debrief.
             </p>
           </div>
 
@@ -196,18 +198,21 @@ export function HangarClient() {
           )}
         </section>
 
-        {/* While you were away */}
-        <AwayReportBanner report={awayReport} />
+        {/* Core loop: voyages, pings, debriefs */}
+        <ProbeVoyagePanel />
 
-        {/* Fleet in the live system */}
-        <FleetStatusPanel report={awayReport} onRefresh={refresh} />
-
-        {/* One-tap launch — recommended CTA when empty; full presets once you have a fleet */}
+        {/* One-tap personality launches */}
         <QuickLaunchPanel
           syncContext={syncContext}
           hasInflight={inflightCount > 0}
           compact={inflightCount === 0}
         />
+
+        {/* While you were away (sim catch-up) */}
+        <AwayReportBanner report={awayReport} />
+
+        {/* Fleet telemetry / command links */}
+        <FleetStatusPanel report={awayReport} onRefresh={refresh} />
 
         {/* Daily quest — light retention */}
         <DailyQuestCompact />

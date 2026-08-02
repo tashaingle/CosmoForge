@@ -127,6 +127,17 @@ export function launchCraft(
 
   const launchedAt = Date.now();
   const orbit = createOrbitForMission(missionId, launchedAt, stats.deltaVms);
+  // Lazy import to avoid circular deps at module init
+  let expectedReturnAt = launchedAt + 20 * 60 * 1000;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { voyageDurationMs } = require("./probe-voyage") as {
+      voyageDurationMs: (id?: MissionProfileId) => number;
+    };
+    expectedReturnAt = launchedAt + voyageDurationMs(missionId);
+  } catch {
+    /* ignore */
+  }
   const next: Craft = {
     ...craft,
     status: "inflight",
@@ -135,6 +146,8 @@ export function launchCraft(
     launchedAt,
     lastSimMs: launchedAt,
     updatedAt: launchedAt,
+    expectedReturnAt,
+    readyToReturn: false,
     commanderName:
       craft.commanderName ||
       sync?.commanderName ||

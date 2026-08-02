@@ -15,13 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CosmoForge — Your ship in today’s solar system",
+  title: "CosmoForge — Little ships with big personalities",
   description:
-    "Launch a probe in one tap into a real-ish solar system. It keeps flying offline. Check in, finish goals, share a mission link — design is optional.",
+    "Launch weird little probes into a real-ish solar system. They fly offline, send odd pings, come back changed — and the real game is the debrief.",
   openGraph: {
     title: "CosmoForge",
     description:
-      "Your probe is still flying in today’s solar system. Launch, command, share.",
+      "Slightly unhinged mission control. Probes with personalities. The fun starts when they return.",
     type: "website",
   },
   appleWebApp: {

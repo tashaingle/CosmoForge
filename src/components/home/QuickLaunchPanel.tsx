@@ -13,6 +13,8 @@ import { formatDeltaV } from "@/lib/ship";
 import type { SyncContext } from "@/lib/storage";
 import { MISSION_PROFILES } from "@/lib/orbital";
 import { getActiveSkyEvents } from "@/lib/sky-events";
+import { getPersonality } from "@/lib/probe-personality";
+import { voyageDurationMs } from "@/lib/probe-voyage";
 
 const ACCENT: Record<
   string,
@@ -92,7 +94,7 @@ export function QuickLaunchPanel({
           <p
             className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${recAccent.tag}`}
           >
-            One-tap launch
+            Send a weirdo
             {active[0] ? ` · ${active[0].name}` : ""}
           </p>
           <h2 className="mt-1 text-xl font-semibold text-white sm:text-2xl">
@@ -102,8 +104,9 @@ export function QuickLaunchPanel({
             {recommended.blurb}
           </p>
           <p className="mt-2 text-xs text-slate-500">
-            {recMission?.name} · {formatDeltaV(recCheck.deltaVms)} Δv ready · no
-            design required
+            {getPersonality(recommended.personalityId).label} ·{" "}
+            {recMission?.name} · ~{Math.round(voyageDurationMs(recommended.missionId) / 60000)}m
+            away · {formatDeltaV(recCheck.deltaVms)} Δv
           </p>
           <div className="mt-4">
             <button
@@ -113,8 +116,8 @@ export function QuickLaunchPanel({
               className={`rounded-xl px-5 py-2.5 text-sm font-semibold shadow-lg disabled:cursor-not-allowed disabled:opacity-50 ${recAccent.btn}`}
             >
               {busy === recommended.id
-                ? "Launching…"
-                : `Launch ${recommended.label}`}
+                ? "Ignition…"
+                : `Launch ${recommended.flavorTitle}`}
             </button>
           </div>
         </div>
@@ -123,10 +126,11 @@ export function QuickLaunchPanel({
       <div id="presets" className="space-y-3">
         <div>
           <h2 className="text-lg font-semibold text-white">
-            {compact ? "Or pick a destination" : "Quick launch"}
+            {compact ? "Or pick an odd job" : "Personality launches"}
           </h2>
           <p className="text-sm text-slate-400">
-            Preset craft — design later if you want to tinker.
+            Each probe gets a name and a voice. Travel is automatic — debrief is
+            the point.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -135,6 +139,7 @@ export function QuickLaunchPanel({
             const check = presetIsReady(p);
             const mission = MISSION_PROFILES.find((m) => m.id === p.missionId);
             const isRec = p.id === recommended.id;
+            const pers = getPersonality(p.personalityId);
             return (
               <div
                 key={p.id}
@@ -150,11 +155,15 @@ export function QuickLaunchPanel({
                     </span>
                   )}
                 </div>
+                <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
+                  {pers.label}
+                </p>
                 <p className="mt-1 flex-1 text-xs leading-relaxed text-slate-400">
                   {p.blurb}
                 </p>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  {mission?.name} · {formatDeltaV(check.deltaVms)}
+                  {mission?.name} · ~{Math.round(voyageDurationMs(p.missionId) / 60000)}m ·{" "}
+                  {formatDeltaV(check.deltaVms)}
                 </p>
                 <button
                   type="button"
@@ -162,7 +171,7 @@ export function QuickLaunchPanel({
                   onClick={() => void onLaunch(p.id)}
                   className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${a.btn}`}
                 >
-                  {busy === p.id ? "Launching…" : "Launch now"}
+                  {busy === p.id ? "Ignition…" : "Send them"}
                 </button>
               </div>
             );

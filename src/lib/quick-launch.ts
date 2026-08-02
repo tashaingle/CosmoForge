@@ -1,6 +1,6 @@
 /**
- * One-tap launches: preset craft + mission, no builder required.
- * Builder stays available as advanced depth.
+ * One-tap launches: personality flavors + preset stacks.
+ * Little ships with big personalities.
  */
 
 import { nanoid } from "nanoid";
@@ -16,30 +16,39 @@ import {
 import type { Craft } from "./types";
 import { getActiveSkyEvents } from "./sky-events";
 import { loadWallet } from "./economy";
+import {
+  generateProbeName,
+  getPersonality,
+  type PersonalityId,
+} from "./probe-personality";
+import { voyageDurationMs } from "./probe-voyage";
 
 export type PresetId = "leo_scout" | "lunar_courier" | "mars_probe";
 
 export interface LaunchPreset {
   id: PresetId;
-  /** Short label on the button */
   label: string;
-  /** Craft name seed */
   craftName: string;
   blurb: string;
   missionId: MissionProfileId;
   partIds: string[];
-  /** UI accent */
   accent: "emerald" | "cyan" | "violet";
+  /** Default personality flavor for this odd job */
+  personalityId: PersonalityId;
+  flavorTitle: string;
 }
 
-/** Guaranteed launch-ready stacks (Δv checked at runtime). */
+/** Guaranteed launch-ready stacks with personality. */
 export const LAUNCH_PRESETS: LaunchPreset[] = [
   {
     id: "leo_scout",
-    label: "LEO Scout",
+    label: "Nervous first orbit",
     craftName: "LEO Scout",
-    blurb: "Park in low Earth orbit in under a minute. Checkout + science.",
+    flavorTitle: "Anxious checkout hop",
+    blurb:
+      "A short LEO job for a probe that triple-checks everything. Back soon with feelings and data.",
     missionId: "leo",
+    personalityId: "anxious",
     partIds: [
       "bus_cubesat",
       "solar_small",
@@ -52,10 +61,13 @@ export const LAUNCH_PRESETS: LaunchPreset[] = [
   },
   {
     id: "lunar_courier",
-    label: "Lunar Courier",
+    label: "Dramatic Moon errand",
     craftName: "Lunar Courier",
-    blurb: "Climb toward the Moon on a high ellipse. The classic first step out.",
+    flavorTitle: "Operatic cislunar jaunt",
+    blurb:
+      "Climb toward the Moon like it owes them rent. Expect monologues. Expect photos.",
     missionId: "lunar",
+    personalityId: "dramatic",
     partIds: [
       "bus_probe",
       "solar_large",
@@ -69,10 +81,13 @@ export const LAUNCH_PRESETS: LaunchPreset[] = [
   },
   {
     id: "mars_probe",
-    label: "Mars Probe",
+    label: "Existential Mars cruise",
     craftName: "Mars Probe",
-    blurb: "Hohmann-class transfer toward Mars. Long cruise — check back often.",
+    flavorTitle: "Long quiet transfer",
+    blurb:
+      "A long haul toward Mars. They’ll ping. Meaning optional. Souvenirs probable.",
     missionId: "mars_transfer",
+    personalityId: "existential",
     partIds: [
       "bus_probe",
       "solar_large",
@@ -91,32 +106,18 @@ export function getPreset(id: PresetId): LaunchPreset {
   return LAUNCH_PRESETS.find((p) => p.id === id) ?? LAUNCH_PRESETS[0];
 }
 
-/** Prefer boosted / event missions, else LEO for first flight. */
 export function pickRecommendedPreset(
   hasInflight: boolean,
   now = Date.now()
 ): LaunchPreset {
   const active = getActiveSkyEvents(now);
-  const eventMissionIds = active
-    .map((e) => e.eventMissionId)
-    .filter(Boolean) as MissionProfileId[];
-
-  // If a sky event boosts a preset mission, recommend that preset
   for (const ev of active) {
     for (const mid of ev.boostMissions) {
       const preset = LAUNCH_PRESETS.find((p) => p.missionId === mid);
       if (preset) return preset;
     }
   }
-
-  // Event-only missions: fall back to LEO scout (easy win during events)
-  if (eventMissionIds.length > 0) {
-    return getPreset("leo_scout");
-  }
-
-  // First craft → LEO; return visits without fleet → lunar; otherwise rotate
   if (!hasInflight) return getPreset("leo_scout");
-
   const day = Math.floor(now / 86400000);
   return LAUNCH_PRESETS[day % LAUNCH_PRESETS.length];
 }
@@ -146,7 +147,6 @@ export function presetIsReady(preset: LaunchPreset): {
       reason: `Need more Δv for ${mission?.name ?? "mission"}`,
     };
   }
-  // Event-only missions need the event active
   if (mission?.eventOnly) {
     const available = getAvailableMissions(
       getActiveSkyEvents()
@@ -172,13 +172,12 @@ export interface QuickLaunchResult {
 }
 
 /**
- * Create a preset craft and launch it immediately.
- * Skips the design → launch screens entirely.
+ * Create a character-probe and launch it.
  */
 export function quickLaunch(
   presetId: PresetId,
   sync?: SyncContext,
-  options?: { name?: string }
+  options?: { name?: string; personalityId?: PersonalityId }
 ): QuickLaunchResult {
   const preset = getPreset(presetId);
   const check = presetIsReady(preset);
@@ -188,15 +187,27 @@ export function quickLaunch(
 
   const wallet = loadWallet();
   const now = Date.now();
+  const seed = Math.floor(Math.random() * 1e9);
+  const personalityId = options?.personalityId ?? preset.personalityId;
+  const personality = getPersonality(personalityId);
+  const name =
+    options?.name?.trim() || generateProbeName(seed);
+
   const craft: Craft = {
     id: nanoid(10),
-    name: options?.name?.trim() || preset.craftName,
+    name,
     partIds: [...preset.partIds],
     createdAt: now,
     updatedAt: now,
     status: "design",
     commanderName: sync?.commanderName || getLocalCommanderName(),
     skinId: wallet.equippedSkinId || "default",
+    personalityId,
+    personalityVibe: personality.vibe,
+    scarIds: [],
+    pings: [],
+    cargoLootIds: [],
+    presetId: preset.id,
   };
 
   upsertCraft(craft, sync);
@@ -204,5 +215,23 @@ export function quickLaunch(
   if (!launched) {
     return { ok: false, error: "Launch failed — check design requirements." };
   }
-  return { ok: true, craft: launched };
+
+  // Ensure voyage timing + first ping flavor
+  const withVoyage: Craft = {
+    ...launched,
+    personalityId,
+    personalityVibe: personality.vibe,
+    expectedReturnAt: (launched.launchedAt ?? now) + voyageDurationMs(preset.missionId),
+    pings: [
+      {
+        id: "depart",
+        atMs: launched.launchedAt ?? now,
+        text: `${name} is away. ${personality.vibe}`,
+        kind: "chat",
+      },
+    ],
+  };
+  upsertCraft(withVoyage, sync);
+
+  return { ok: true, craft: withVoyage };
 }

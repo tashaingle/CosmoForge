@@ -1,4 +1,27 @@
 import type { OrbitElements, MissionProfileId } from "./orbital";
+import type { PersonalityId, ScarId } from "./probe-personality";
+import type { LootId } from "./probe-loot";
+
+/** Short message from a probe while away */
+export interface ProbePing {
+  id: string;
+  atMs: number;
+  text: string;
+  kind: "chat" | "milestone" | "return";
+}
+
+/** Shown when a probe comes home — the real game moment */
+export interface VoyageDebrief {
+  craftId: string;
+  craftName: string;
+  missionName: string;
+  opener: string;
+  summary: string;
+  highlights: string[];
+  lootIds: LootId[];
+  scarIds: ScarId[];
+  personalityId: PersonalityId;
+}
 
 export interface Craft {
   id: string;
@@ -20,6 +43,24 @@ export interface Craft {
   commanderName?: string;
   /** Cosmetic skin id */
   skinId?: string;
+
+  // —— Little Ships With Big Personalities ——
+  personalityId?: PersonalityId;
+  /** One-line vibe shown in hangar */
+  personalityVibe?: string;
+  /** Permanent changes from voyages */
+  scarIds?: ScarId[];
+  /** Messages while away */
+  pings?: ProbePing[];
+  /** Loot in hold (catalogued on debrief) */
+  cargoLootIds?: LootId[];
+  /** Wall-clock when voyage is “done enough” to call home */
+  expectedReturnAt?: number;
+  readyToReturn?: boolean;
+  /** Last completed debrief (for re-read) */
+  lastDebrief?: VoyageDebrief;
+  /** Preset flavor id if launched from one-tap */
+  presetId?: string;
 }
 
 export interface FleetState {
