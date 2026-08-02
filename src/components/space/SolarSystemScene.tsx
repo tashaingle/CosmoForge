@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Html, Line, OrbitControls } from "@react-three/drei";
+import { Line, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { MOONS, PLANETS, type BodyId, getBody, bodyPositionAU } from "@/lib/bodies";
 import { craftScenePosition, type OrbitElements } from "@/lib/orbital";
@@ -23,7 +23,7 @@ import {
   allBodyTextureUrls,
   getBodyVisual,
 } from "@/lib/body-visuals";
-import { BodyLabel } from "./BodyLabel";
+import { CraftModel } from "./CraftModel";
 
 interface SolarSystemSceneProps {
   simMs: number;
@@ -66,13 +66,11 @@ function OrbitRing({
 function BodyMesh({
   bodyId,
   simMs,
-  showLabel,
   scale = 1,
   closeBoost = false,
 }: {
   bodyId: BodyId;
   simMs: number;
-  showLabel: boolean;
   scale?: number;
   /** Slightly larger when camera is focused on this body */
   closeBoost?: boolean;
@@ -83,9 +81,6 @@ function BodyMesh({
   const sun = bodyPositionAU("sun", simMs);
   const sunPos: [number, number, number] = [sun.x, sun.y, sun.z];
   const position: [number, number, number] = [pos.x, pos.y, pos.z];
-
-  const labelVariant =
-    def.id === "sun" ? "sun" : def.kind === "moon" ? "moon" : "planet";
 
   // Earth keeps the full day/night/clouds treatment
   if (def.id === "earth") {
@@ -102,9 +97,6 @@ function BodyMesh({
           showLabel={false}
           simMs={simMs}
         />
-        {showLabel && (
-          <BodyLabel name={def.name} radius={r} variant="planet" />
-        )}
       </group>
     );
   }
@@ -129,13 +121,6 @@ function BodyMesh({
             def.kind === "moon" ? 48 : def.id === "sun" ? 48 : 72
           }
         />
-        {showLabel && (
-          <BodyLabel
-            name={def.name}
-            radius={r}
-            variant={labelVariant}
-          />
-        )}
       </group>
     );
   }
@@ -153,9 +138,6 @@ function BodyMesh({
           metalness={0.1}
         />
       </mesh>
-      {showLabel && (
-        <BodyLabel name={def.name} radius={r} variant={labelVariant} />
-      )}
     </group>
   );
 }
@@ -163,26 +145,22 @@ function BodyMesh({
 function CraftMarker({
   orbit,
   simMs,
-  name,
-  subtitle,
   color = "#22d3ee",
-  size = 0.018,
   showTrail = true,
-  showLabel = true,
+  isPlayer = false,
 }: {
   orbit: OrbitElements;
   simMs: number;
-  name: string;
+  name?: string;
   subtitle?: string;
   color?: string;
   size?: number;
   showTrail?: boolean;
   showLabel?: boolean;
+  isPlayer?: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const trail = useRef<THREE.Vector3[]>([]);
-  const { camera } = useThree();
-  const [labelOn, setLabelOn] = useState(true);
 
   useFrame(() => {
     if (!ref.current) return;
@@ -190,14 +168,7 @@ function CraftMarker({
     ref.current.position.set(p.x, p.y, p.z);
     if (showTrail) {
       trail.current.push(new THREE.Vector3(p.x, p.y, p.z));
-      if (trail.current.length > 70) trail.current.shift();
-    }
-    if (showLabel) {
-      const dist = camera.position.distanceTo(
-        new THREE.Vector3(p.x, p.y, p.z)
-      );
-      // Only label when not hugging the craft / planet
-      setLabelOn(dist > 0.2 && dist < 12);
+      if (trail.current.length > 90) trail.current.shift();
     }
   });
 
@@ -207,54 +178,15 @@ function CraftMarker({
   return (
     <>
       <group ref={ref}>
-        <mesh>
-          <octahedronGeometry args={[size, 0]} />
-          <meshStandardMaterial
-            color="#f8fafc"
-            emissive={color}
-            emissiveIntensity={1}
-          />
-        </mesh>
-        <mesh>
-          <sphereGeometry args={[size * 2.4, 16, 16]} />
-          <meshBasicMaterial
-            color={color}
-            transparent
-            opacity={0.18}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </mesh>
-        {showLabel && labelOn && (
-          <Html
-            center
-            distanceFactor={10}
-            position={[0, size * 3.5, 0]}
-            style={{ pointerEvents: "none" }}
-            zIndexRange={[8, 0]}
-          >
-            <div
-              className="max-w-[120px] select-none truncate whitespace-nowrap rounded-md border bg-slate-950/50 px-1.5 py-0.5 text-[9px] backdrop-blur-[2px]"
-              style={{
-                borderColor: `${color}44`,
-                color: "#e2e8f0",
-              }}
-            >
-              {name}
-              {subtitle ? (
-                <span className="block text-[8px] opacity-60">{subtitle}</span>
-              ) : null}
-            </div>
-          </Html>
-        )}
+        <CraftModel color={color} baseSize={isPlayer ? 0.014 : 0.01} />
       </group>
       {showTrail && trail.current.length > 2 && (
         <Line
           points={trailPoints}
           color={color}
-          lineWidth={1}
+          lineWidth={isPlayer ? 1.5 : 1}
           transparent
-          opacity={0.45}
+          opacity={isPlayer ? 0.55 : 0.3}
         />
       )}
     </>
@@ -309,17 +241,21 @@ function desiredCloseDistance(
   focus: SolarSystemSceneProps["focus"],
   craftOrbit?: OrbitElements | null
 ): number {
-  if (focus === "craft" && craftOrbit?.centralBody === "earth") return 0.14;
-  if (focus === "earth" || focus === "moon") return 0.11;
-  if (focus === "mars" || focus === "venus" || focus === "mercury") return 0.1;
-  if (focus === "jupiter" || focus === "saturn") return 0.22;
-  if (focus === "uranus" || focus === "neptune") return 0.16;
-  if (typeof focus === "string" && focus !== "system" && focus !== "craft") {
-    const b = getBody(focus);
-    if (b?.kind === "moon") return 0.08;
-    if (b?.kind === "dwarf") return 0.09;
+  // Wide enough that user can immediately zoom out; not a locked close-up
+  if (focus === "craft") {
+    return craftOrbit?.centralBody === "earth" ? 0.28 : 0.55;
   }
-  return 0.14;
+  if (focus === "earth" || focus === "moon") return 0.22;
+  if (focus === "mars" || focus === "venus" || focus === "mercury") return 0.2;
+  if (focus === "jupiter" || focus === "saturn") return 0.45;
+  if (focus === "uranus" || focus === "neptune") return 0.35;
+  // Remaining BodyId focuses (other moons / dwarfs)
+  if (focus !== "system") {
+    const b = getBody(focus as BodyId);
+    if (b?.kind === "moon") return 0.16;
+    if (b?.kind === "dwarf") return 0.18;
+  }
+  return 0.3;
 }
 
 function CameraRig({
@@ -335,27 +271,27 @@ function CameraRig({
   const controls = useRef<any>(null);
   const { camera } = useThree();
   const prevFocus = useRef(focus);
-  /** Auto-frame only briefly when focus changes — then free orbit/zoom */
-  const frameFrames = useRef(0);
+  /** Auto-frame only when focus changes — then full free orbit/zoom */
+  const frameFrames = useRef(focus === "system" ? 0 : 28);
   const tmpOffset = useRef(new THREE.Vector3());
   const tmpTarget = useRef(new THREE.Vector3());
+  const userZooming = useRef(false);
 
   useFrame(() => {
     const c = controls.current;
     if (!c) return;
 
-    // Always allow full system zoom — never lock the user in
-    c.minDistance = 0.035;
-    c.maxDistance = 90;
-    c.maxPolarAngle = Math.PI * 0.92;
+    c.minDistance = 0.02;
+    c.maxDistance = 120;
+    c.maxPolarAngle = Math.PI * 0.95;
 
     if (prevFocus.current !== focus) {
       prevFocus.current = focus;
-      // ~0.7s of gentle framing when you pick a new target
-      frameFrames.current = focus === "system" ? 0 : 42;
+      userZooming.current = false;
+      frameFrames.current = focus === "system" ? 0 : 28;
     }
 
-    // Free look: System mode does not pull the camera or retarget
+    // Free look: do not touch camera or target
     if (focus === "system") {
       return;
     }
@@ -370,21 +306,18 @@ function CameraRig({
       return;
     }
 
-    // Soft-follow so the body stays under the orbit pivot as it moves
-    c.target.lerp(tmpTarget.current, 0.12);
+    // Keep pivot on target so drag orbits the craft/body (not free-float)
+    c.target.lerp(tmpTarget.current, 0.15);
 
-    // One-shot approach when focus first changes (not every frame forever)
-    if (frameFrames.current > 0) {
+    // Brief open shot only — stop if user already scrolled/dragged
+    if (frameFrames.current > 0 && !userZooming.current) {
       frameFrames.current -= 1;
       const desired = desiredCloseDistance(focus, craftOrbit);
       const offset = tmpOffset.current
         .copy(camera.position)
         .sub(c.target as THREE.Vector3);
-      const dist = offset.length();
-      if (offset.lengthSq() < 1e-8) {
-        offset.set(0.1, 0.06, 0.12);
-      }
-      const next = THREE.MathUtils.lerp(dist, desired, 0.12);
+      if (offset.lengthSq() < 1e-8) offset.set(0.12, 0.08, 0.18);
+      const next = THREE.MathUtils.lerp(offset.length(), desired, 0.18);
       offset.setLength(Math.max(next, c.minDistance));
       camera.position.copy(c.target as THREE.Vector3).add(offset);
       c.update?.();
@@ -395,15 +328,20 @@ function CameraRig({
     <OrbitControls
       ref={controls}
       enableDamping
-      dampingFactor={0.09}
-      minDistance={0.035}
-      maxDistance={90}
-      maxPolarAngle={Math.PI * 0.92}
-      rotateSpeed={0.75}
-      // User can always drag / zoom after framing
+      dampingFactor={0.08}
+      minDistance={0.02}
+      maxDistance={120}
+      maxPolarAngle={Math.PI * 0.95}
+      rotateSpeed={0.8}
+      zoomSpeed={1.1}
       enablePan
       enableZoom
       enableRotate
+      onStart={() => {
+        // Any user input cancels auto-frame so zoom-out always works
+        userZooming.current = true;
+        frameFrames.current = 0;
+      }}
     />
   );
 }
@@ -521,8 +459,6 @@ export function SolarSystemScene({
           key={p.id}
           bodyId={p.id}
           simMs={simMs}
-          // Overview only — hide when inspecting a world so textures stay clear
-          showLabel={focus === "system" && p.id !== "sun"}
           closeBoost={bodyClose && focusBodyId === p.id}
         />
       ))}
@@ -532,10 +468,6 @@ export function SolarSystemScene({
           key={m.id}
           bodyId={m.id}
           simMs={simMs}
-          // Moon tags only when looking at the parent planet (not on top of the moon itself)
-          showLabel={
-            focus === m.parentId && focusBodyId !== m.id
-          }
           scale={focus === m.parentId || focus === m.id ? 1.15 : 0.9}
           closeBoost={focusBodyId === m.id}
         />
@@ -546,16 +478,13 @@ export function SolarSystemScene({
           key={oc.id}
           orbit={oc.orbit}
           simMs={simMs}
-          name={oc.name}
-          subtitle={oc.commanderName}
           color={
             oc.skinId
               ? getSkin(oc.skinId).color
               : OTHER_COLORS[i % OTHER_COLORS.length]
           }
-          size={0.012}
           showTrail={false}
-          showLabel={focus === "system" || focus === "craft"}
+          isPlayer={false}
         />
       ))}
 
@@ -565,9 +494,9 @@ export function SolarSystemScene({
           <CraftMarker
             orbit={craftOrbit}
             simMs={simMs}
-            name={craftName}
             color={playerColor}
-            showLabel={focus === "system" || focus === "craft"}
+            showTrail
+            isPlayer
           />
         </>
       )}

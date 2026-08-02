@@ -7,7 +7,7 @@
 
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useTexture, Html } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
 const DAY = "/textures/earth/day.jpg";
@@ -299,13 +299,6 @@ export function EarthGlobe({
           blending={THREE.AdditiveBlending}
         />
       </mesh>
-      {showLabel && (
-        <Html distanceFactor={7} style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap rounded border border-sky-400/25 bg-black/55 px-1.5 py-0.5 text-[10px] text-sky-50 shadow">
-            Earth
-          </div>
-        </Html>
-      )}
     </group>
   );
 }

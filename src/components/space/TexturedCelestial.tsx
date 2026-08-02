@@ -7,7 +7,7 @@
 
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useTexture, Html } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import type { BodyVisual } from "@/lib/body-visuals";
 
@@ -348,22 +348,6 @@ export function TexturedCelestial({
         </>
       )}
 
-      {showLabel && (
-        <Html
-          distanceFactor={label === "Pluto" ? 10 : isSun ? 14 : 7}
-          style={{ pointerEvents: "none" }}
-        >
-          <div
-            className={`whitespace-nowrap rounded border bg-black/55 px-1.5 py-0.5 text-[10px] shadow ${
-              isSun
-                ? "border-amber-400/30 text-amber-100"
-                : "border-white/15 text-cyan-50"
-            }`}
-          >
-            {label}
-          </div>
-        </Html>
-      )}
     </group>
   );
 }

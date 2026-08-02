@@ -57,10 +57,8 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   );
   const [timeScale, setTimeScale] = useState(1000);
   const [paused, setPaused] = useState(false);
-  // Earth-centric missions open on Earth (Google Earth–style globe); deep space → system
-  const [focus, setFocus] = useState<Focus>(() =>
-    craft.orbit?.centralBody === "earth" ? "earth" : "system"
-  );
+  // Open on the craft so the first thing you see is YOUR ship, not empty void
+  const [focus, setFocus] = useState<Focus>("craft");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [others, setOthers] = useState<LiveCraftMarker[]>([]);
@@ -276,6 +274,11 @@ export function MissionClient({ craft, readOnly = false }: Props) {
             <p className="truncate text-[11px] text-slate-400 sm:text-xs">
               {mission?.name ?? "Mission"} · Goals {doneCount}/
               {briefing.objectives.length}
+              {focus === "craft"
+                ? " · tracking craft"
+                : focus === "system"
+                  ? " · free look"
+                  : ` · looking at ${getBody(focus)?.name ?? focus}`}
               {others.length > 0 ? ` · ${others.length} others` : ""}
             </p>
           </div>
