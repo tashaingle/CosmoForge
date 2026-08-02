@@ -36,8 +36,9 @@ export function SolarSystemCanvas({
           antialias: true,
           alpha: false,
           powerPreference: "high-performance",
+          // ACESFilmic — richer Earth color like Google Earth screenshots
           toneMapping: 4,
-          toneMappingExposure: 1.1,
+          toneMappingExposure: 1.15,
         }}
       >
         <Suspense fallback={null}>

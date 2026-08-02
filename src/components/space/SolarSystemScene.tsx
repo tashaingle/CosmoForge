@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { MOONS, PLANETS, type BodyId, getBody, bodyPositionAU } from "@/lib/bodies";
@@ -18,6 +18,7 @@ import {
   ParticleCloud,
   SunGlow,
 } from "./SpaceEnvironment";
+import { EarthGlobe, preloadEarthTextures } from "./EarthGlobe";
 
 interface SolarSystemSceneProps {
   simMs: number;
@@ -62,11 +63,14 @@ function BodyMesh({
   simMs,
   showLabel,
   scale = 1,
+  earthBoost = false,
 }: {
   bodyId: BodyId;
   simMs: number;
   showLabel: boolean;
   scale?: number;
+  /** Slightly larger Earth when camera is close (Google Earth framing) */
+  earthBoost?: boolean;
 }) {
   const def = getBody(bodyId)!;
   const pos = bodyPositionAU(bodyId, simMs);
@@ -97,6 +101,20 @@ function BodyMesh({
     );
   }
 
+  if (def.id === "earth") {
+    const sun = bodyPositionAU("sun", simMs);
+    const er = r * (earthBoost ? 1.35 : 1);
+    return (
+      <EarthGlobe
+        radius={er}
+        position={[pos.x, pos.y, pos.z]}
+        sunPosition={[sun.x, sun.y, sun.z]}
+        showLabel={showLabel}
+        simMs={simMs}
+      />
+    );
+  }
+
   return (
     <group position={[pos.x, pos.y, pos.z]}>
       <mesh>
@@ -111,9 +129,6 @@ function BodyMesh({
       </mesh>
 
       {/* Atmospheres / sheens */}
-      {def.id === "earth" && (
-        <AtmosphereShell radius={r} color="#60a5fa" intensity={0.4} />
-      )}
       {def.id === "venus" && (
         <AtmosphereShell radius={r} color="#fde68a" intensity={0.28} />
       )}
@@ -294,6 +309,15 @@ function CraftOrbitPreview({
   );
 }
 
+function isEarthCloseFocus(
+  focus: SolarSystemSceneProps["focus"],
+  craftOrbit?: OrbitElements | null
+): boolean {
+  if (focus === "earth" || focus === "moon") return true;
+  if (focus === "craft" && craftOrbit?.centralBody === "earth") return true;
+  return false;
+}
+
 function CameraRig({
   focus,
   simMs,
@@ -305,6 +329,8 @@ function CameraRig({
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controls = useRef<any>(null);
+  const { camera } = useThree();
+  const earthClose = isEarthCloseFocus(focus, craftOrbit);
 
   useFrame(() => {
     const c = controls.current;
@@ -318,16 +344,40 @@ function CameraRig({
       target.set(p.x, p.y, p.z);
     }
     c.target.lerp(target, 0.08);
+
+    // Google Earth–style framing: pull in when Earth / LEO / Moon
+    if (earthClose) {
+      c.minDistance = 0.045;
+      c.maxDistance = 1.2;
+      c.maxPolarAngle = Math.PI * 0.88;
+      const offset = camera.position.clone().sub(c.target as THREE.Vector3);
+      const dist = offset.length();
+      const desired =
+        focus === "earth" ? 0.11 : focus === "moon" ? 0.09 : 0.14;
+      if (dist > desired * 2.2 || dist < 0.02) {
+        const next = THREE.MathUtils.lerp(dist, desired, 0.06);
+        if (offset.lengthSq() < 1e-8) {
+          offset.set(0.08, 0.05, 0.1);
+        }
+        offset.setLength(Math.max(next, c.minDistance));
+        camera.position.copy(c.target as THREE.Vector3).add(offset);
+      }
+    } else {
+      c.minDistance = 0.08;
+      c.maxDistance = 90;
+      c.maxPolarAngle = Math.PI * 0.92;
+    }
   });
 
   return (
     <OrbitControls
       ref={controls}
       enableDamping
-      dampingFactor={0.08}
-      minDistance={0.08}
-      maxDistance={90}
+      dampingFactor={earthClose ? 0.1 : 0.08}
+      minDistance={earthClose ? 0.045 : 0.08}
+      maxDistance={earthClose ? 1.2 : 90}
       maxPolarAngle={Math.PI * 0.92}
+      rotateSpeed={earthClose ? 0.55 : 0.8}
     />
   );
 }
@@ -365,13 +415,21 @@ export function SolarSystemScene({
 }: SolarSystemSceneProps) {
   const playerColor = getSkin(craftSkinId).color;
   const moons = visibleMoons(focus);
+  const earthClose = isEarthCloseFocus(focus, craftOrbit);
+
+  useEffect(() => {
+    preloadEarthTextures();
+  }, []);
 
   return (
     <>
       <color attach="background" args={["#01040f"]} />
       <fog attach="fog" args={["#01040f", 35, 95]} />
-      <ambientLight intensity={0.08} />
-      <hemisphereLight args={["#1e293b", "#020617", 0.35]} />
+      {/* Dimmer ambient so Earth day/night terminator reads */}
+      <ambientLight intensity={earthClose ? 0.04 : 0.08} />
+      <hemisphereLight
+        args={["#1e293b", "#020617", earthClose ? 0.2 : 0.35]}
+      />
 
       <DeepStarfield />
       <EclipticDust />
@@ -439,6 +497,7 @@ export function SolarSystemScene({
           bodyId={p.id}
           simMs={simMs}
           showLabel={p.id !== "sun"}
+          earthBoost={earthClose && p.id === "earth"}
         />
       ))}
 

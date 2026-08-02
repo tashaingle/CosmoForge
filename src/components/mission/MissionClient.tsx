@@ -57,8 +57,10 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   );
   const [timeScale, setTimeScale] = useState(1000);
   const [paused, setPaused] = useState(false);
-  // Default to system view so belt / planets are obvious (not craft zoom)
-  const [focus, setFocus] = useState<Focus>("system");
+  // Earth-centric missions open on Earth (Google Earth–style globe); deep space → system
+  const [focus, setFocus] = useState<Focus>(() =>
+    craft.orbit?.centralBody === "earth" ? "earth" : "system"
+  );
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [others, setOthers] = useState<LiveCraftMarker[]>([]);
@@ -398,9 +400,9 @@ export function MissionClient({ craft, readOnly = false }: Props) {
           <div className="mt-2 flex flex-wrap gap-1.5">
             {(
               [
+                ["earth", "Earth"],
                 ["craft", "Craft"],
                 ["system", "System"],
-                ["earth", "Earth"],
                 ["moon", "Moon"],
                 ["mars", "Mars"],
                 ["jupiter", "Jupiter"],
@@ -423,11 +425,20 @@ export function MissionClient({ craft, readOnly = false }: Props) {
               </button>
             ))}
           </div>
-          {focus !== "system" && focus !== "craft" && getBody(focus) && (
-            <p className="mt-2 text-[11px] text-slate-500">
-              {getBody(focus)!.blurb}
+          {(focus === "earth" ||
+            (focus === "craft" && craft.orbit?.centralBody === "earth")) && (
+            <p className="mt-2 text-[11px] text-sky-300/80">
+              Globe view — drag to orbit, scroll to zoom (Google Earth–style).
             </p>
           )}
+          {focus !== "system" &&
+            focus !== "craft" &&
+            focus !== "earth" &&
+            getBody(focus) && (
+              <p className="mt-2 text-[11px] text-slate-500">
+                {getBody(focus)!.blurb}
+              </p>
+            )}
         </div>
 
         {activeEvents.length > 0 && !readOnly && (
