@@ -1,30 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  MISSION_PROFILES,
+  getAvailableMissions,
   type MissionProfileId,
 } from "@/lib/orbital";
 import { computeStats, formatDeltaV } from "@/lib/ship";
-import { getCraft, launchCraft } from "@/lib/storage";
+import { getCraft, launchCraft, upsertCraft } from "@/lib/storage";
 import type { Craft } from "@/lib/types";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import {
+  getActiveSkyEvents,
+  isMissionBoosted,
+} from "@/lib/sky-events";
+import { computeLaunchReward } from "@/lib/economy";
 
 export function LaunchClient({ craftId }: { craftId: string }) {
   const router = useRouter();
-  const { ready, syncContext, user } = useAuth();
+  const { ready, syncContext, user, wallet } = useAuth();
   const [craft, setCraft] = useState<Craft | null | undefined>(undefined);
   const [missionId, setMissionId] = useState<MissionProfileId>("leo");
   const [error, setError] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
 
+  const active = useMemo(() => getActiveSkyEvents(), []);
+  const eventMissionIds = useMemo(
+    () =>
+      active
+        .map((e) => e.eventMissionId)
+        .filter(Boolean) as MissionProfileId[],
+    [active]
+  );
+  const missions = useMemo(
+    () => getAvailableMissions(eventMissionIds),
+    [eventMissionIds]
+  );
+
   useEffect(() => {
     if (!ready) return;
     setCraft(getCraft(craftId) ?? null);
   }, [craftId, ready]);
+
+  useEffect(() => {
+    if (!missions.find((m) => m.id === missionId) && missions[0]) {
+      setMissionId(missions[0].id);
+    }
+  }, [missions, missionId]);
 
   if (!ready || craft === undefined) {
     return <LoadingScreen label="Preparing launch…" />;
@@ -47,24 +71,37 @@ export function LaunchClient({ craftId }: { craftId: string }) {
   }
 
   const stats = computeStats(craft.partIds);
-  const mission = MISSION_PROFILES.find((m) => m.id === missionId)!;
-  const canFly = stats.launchReady && stats.deltaVms >= mission.minDeltaV;
+  const mission = missions.find((m) => m.id === missionId) ?? missions[0];
+  const canFly =
+    mission &&
+    stats.launchReady &&
+    stats.deltaVms >= mission.minDeltaV;
+  const reward = mission ? computeLaunchReward(mission.id) : null;
+  const boost = mission ? isMissionBoosted(mission.id) : undefined;
 
   function onLaunch() {
     setError(null);
-    if (!canFly) {
+    if (!mission || !canFly) {
       setError(
-        `Need at least ${formatDeltaV(mission.minDeltaV)} Δv for ${mission.name}.`
+        mission
+          ? `Need at least ${formatDeltaV(mission.minDeltaV)} Δv for ${mission.name}.`
+          : "No mission selected."
       );
       return;
     }
     setLaunching(true);
-    const next = launchCraft(craft!.id, missionId, syncContext);
+    const withSkin = {
+      ...craft!,
+      skinId: craft!.skinId || wallet.equippedSkinId || "default",
+    };
+    upsertCraft(withSkin, syncContext);
+    const next = launchCraft(withSkin.id, mission.id, syncContext);
     if (!next) {
       setError("Launch failed — check design requirements.");
       setLaunching(false);
       return;
     }
+    // re-apply skin on launched craft via storage already done; patch if needed
     router.push(`/mission/${next.id}`);
   }
 
@@ -88,18 +125,26 @@ export function LaunchClient({ craftId }: { craftId: string }) {
           <span className="font-semibold text-cyan-300">
             {formatDeltaV(stats.deltaVms)}
           </span>
-          . Pick a mission profile.
-          {!user && (
-            <span className="mt-1 block text-amber-200/80">
-              Tip: sign in so this craft appears on the shared map for others.
-            </span>
-          )}
+          {" · "}
+          Balance:{" "}
+          <span className="font-semibold text-amber-200">
+            ✦ {wallet.credits} cr
+          </span>
         </p>
 
+        {active.length > 0 && (
+          <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+            <span className="font-semibold">Sky event active:</span>{" "}
+            {active.map((e) => e.name).join(" · ")}
+          </div>
+        )}
+
         <div className="mt-6 space-y-3 sm:mt-8">
-          {MISSION_PROFILES.map((m) => {
+          {missions.map((m) => {
             const ok = stats.deltaVms >= m.minDeltaV;
             const selected = missionId === m.id;
+            const mBoost = isMissionBoosted(m.id);
+            const mReward = computeLaunchReward(m.id);
             return (
               <button
                 key={m.id}
@@ -113,9 +158,27 @@ export function LaunchClient({ craftId }: { craftId: string }) {
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <div className="font-semibold text-white">{m.name}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-white">{m.name}</span>
+                      {m.eventOnly && (
+                        <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] uppercase text-violet-200">
+                          Event
+                        </span>
+                      )}
+                      {mBoost && (
+                        <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] uppercase text-emerald-200">
+                          Boosted
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-1 text-sm text-slate-400">
                       {m.description}
+                    </p>
+                    <p className="mt-1 text-xs text-amber-200/90">
+                      Reward ~✦ {mReward.total}
+                      {mReward.multiplier > 1
+                        ? ` (×${mReward.multiplier})`
+                        : ""}
                     </p>
                   </div>
                   <div className="text-right text-xs">
@@ -145,9 +208,22 @@ export function LaunchClient({ craftId }: { craftId: string }) {
           })}
         </div>
 
+        {reward && boost && (
+          <p className="mt-3 text-xs text-emerald-300/90">
+            {boost.name} is boosting this profile.
+          </p>
+        )}
+
         {error && (
           <p className="mt-4 text-sm text-rose-300" role="alert">
             {error}
+          </p>
+        )}
+
+        {!user && (
+          <p className="mt-3 text-xs text-amber-200/80">
+            Tip: sign in so this craft (and your cosmetics) appear on the shared
+            map.
           </p>
         )}
 
@@ -159,8 +235,10 @@ export function LaunchClient({ craftId }: { craftId: string }) {
         >
           {launching
             ? "Ignition…"
-            : canFly
-              ? `Launch — ${mission.name}`
+            : canFly && mission
+              ? `Launch — ${mission.name}${
+                  reward ? ` · +✦ ${reward.total}` : ""
+                }`
               : "Insufficient Δv or incomplete design"}
         </button>
       </div>

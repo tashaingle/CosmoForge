@@ -16,6 +16,11 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { LoadingScreen, InlineSpinner } from "@/components/ui/LoadingScreen";
+import { SkyEventsPanel } from "@/components/events/SkyEventsPanel";
+import { CosmeticsShop } from "@/components/shop/CosmeticsShop";
+import { getActiveSkyEvents } from "@/lib/sky-events";
+import { getSkin } from "@/lib/cosmetics";
+import type { PlayerWallet } from "@/lib/economy";
 
 export function HangarClient() {
   const {
@@ -26,30 +31,42 @@ export function HangarClient() {
     cloudSyncing,
     cloudSynced,
     syncContext,
+    wallet,
     updateDisplayName,
     refreshCloudFleet,
+    refreshWallet,
   } = useAuth();
   const [fleet, setFleet] = useState<FleetState | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [nameEdit, setNameEdit] = useState("");
+  const [localWallet, setLocalWallet] = useState<PlayerWallet | null>(null);
 
   useEffect(() => {
     if (!ready) return;
     setFleet(loadFleet());
     setNameEdit(displayName);
-  }, [ready, displayName, cloudSynced, cloudSyncing]);
+    setLocalWallet(wallet);
+  }, [ready, displayName, cloudSynced, cloudSyncing, wallet]);
 
   function refresh() {
     setFleet(loadFleet());
+    refreshWallet();
+    setLocalWallet(wallet);
   }
 
   function onNew() {
-    const craft = createCraft(`Probe ${((fleet?.crafts.length ?? 0) + 1)}`);
+    const skin = (localWallet ?? wallet).equippedSkinId;
+    const craft = createCraft(
+      `Probe ${((fleet?.crafts.length ?? 0) + 1)}`,
+      skin
+    );
     craft.commanderName = displayName;
     upsertCraft(craft, syncContext);
     refresh();
     window.location.href = `/design/${craft.id}`;
   }
+
+  const activeEvents = getActiveSkyEvents();
 
   function onDelete(id: string) {
     if (!confirm("Delete this craft?")) return;
@@ -131,7 +148,31 @@ export function HangarClient() {
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
                 Shared solar system
               </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                Credits &amp; cosmetics
+              </li>
             </ul>
+
+            {activeEvents.length > 0 && (
+              <div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+                  Live sky event
+                </p>
+                <p className="mt-1 text-sm font-medium text-emerald-50">
+                  {activeEvents[0].name}
+                  {activeEvents.length > 1
+                    ? ` +${activeEvents.length - 1} more`
+                    : ""}
+                </p>
+                <p className="mt-0.5 text-xs text-emerald-100/70">
+                  Launch bonuses active ·{" "}
+                  <a href="#events" className="underline hover:text-white">
+                    see all
+                  </a>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Phone-ish preview card */}
@@ -183,16 +224,16 @@ export function HangarClient() {
               d: "Modular parts with mass, power, and rocket-equation Δv.",
             },
             {
-              t: "Launch & explore",
-              d: "LEO, lunar, Mars transfer, or belt scout missions.",
+              t: "Sky events",
+              d: "Real calendar windows boost rewards and unlock missions.",
             },
             {
-              t: "Cloud hangar",
-              d: "Sign in and your fleet follows you on every device.",
+              t: "Credits economy",
+              d: "Earn on launch, spend on limited liveries and prestige skins.",
             },
             {
               t: "Shared sky",
-              d: "See other players’ probes as live markers in the system.",
+              d: "Other commanders appear live — with their cosmetics.",
             },
           ].map((c) => (
             <div
@@ -206,6 +247,25 @@ export function HangarClient() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Events + shop */}
+      <section
+        id="events"
+        className="relative mx-auto max-w-6xl space-y-4 px-4 pb-10"
+      >
+        <SkyEventsPanel />
+      </section>
+      <section id="shop" className="relative mx-auto max-w-6xl px-4 pb-12">
+        {(localWallet || wallet) && (
+          <CosmeticsShop
+            wallet={localWallet ?? wallet}
+            onWalletChange={(w) => {
+              setLocalWallet(w);
+              refreshWallet();
+            }}
+          />
+        )}
       </section>
 
       {/* Hangar */}
@@ -334,11 +394,17 @@ function CraftRow({
 }) {
   const stats = computeStats(craft.partIds);
   const mission = MISSION_PROFILES.find((m) => m.id === craft.missionId);
+  const skin = getSkin(craft.skinId);
 
   return (
     <li className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ background: skin.color }}
+            title={skin.name}
+          />
           <h3 className="truncate text-lg font-medium text-white">
             {craft.name}
           </h3>

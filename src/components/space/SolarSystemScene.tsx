@@ -11,11 +11,13 @@ import {
   type OrbitElements,
 } from "@/lib/orbital";
 import type { LiveCraftMarker } from "@/lib/types";
+import { getSkin } from "@/lib/cosmetics";
 
 interface SolarSystemSceneProps {
   simMs: number;
   craftOrbit?: OrbitElements | null;
   craftName?: string;
+  craftSkinId?: string;
   focus: "system" | "craft" | PlanetId;
   otherCrafts?: LiveCraftMarker[];
 }
@@ -246,9 +248,12 @@ export function SolarSystemScene({
   simMs,
   craftOrbit,
   craftName = "Craft",
+  craftSkinId,
   focus,
   otherCrafts = [],
 }: SolarSystemSceneProps) {
+  const playerColor = getSkin(craftSkinId).color;
+
   return (
     <>
       <color attach="background" args={["#020617"]} />
@@ -283,7 +288,11 @@ export function SolarSystemScene({
           simMs={simMs}
           name={oc.name}
           subtitle={oc.commanderName}
-          color={OTHER_COLORS[i % OTHER_COLORS.length]}
+          color={
+            oc.skinId
+              ? getSkin(oc.skinId).color
+              : OTHER_COLORS[i % OTHER_COLORS.length]
+          }
           size={0.012}
           showTrail={false}
         />
@@ -292,7 +301,12 @@ export function SolarSystemScene({
       {craftOrbit && (
         <>
           <CraftOrbitPreview orbit={craftOrbit} simMs={simMs} />
-          <CraftMarker orbit={craftOrbit} simMs={simMs} name={craftName} />
+          <CraftMarker
+            orbit={craftOrbit}
+            simMs={simMs}
+            name={craftName}
+            color={playerColor}
+          />
         </>
       )}
 

@@ -34,7 +34,15 @@ export interface OrbitElements {
   centralBody: "sun" | "earth";
 }
 
-export type MissionProfileId = "leo" | "lunar" | "mars_transfer" | "asteroid_belt";
+export type MissionProfileId =
+  | "leo"
+  | "lunar"
+  | "mars_transfer"
+  | "asteroid_belt"
+  | "event_meteor_watch"
+  | "event_mars_rush"
+  | "event_storm_rider"
+  | "event_eclipse_chase";
 
 export interface MissionProfile {
   id: MissionProfileId;
@@ -43,6 +51,8 @@ export interface MissionProfile {
   /** Minimum delta-v (m/s) to attempt */
   minDeltaV: number;
   difficulty: "easy" | "medium" | "hard";
+  /** Only offered while matching sky event is active */
+  eventOnly?: boolean;
 }
 
 export const MISSION_PROFILES: MissionProfile[] = [
@@ -75,7 +85,52 @@ export const MISSION_PROFILES: MissionProfile[] = [
     minDeltaV: 3800,
     difficulty: "hard",
   },
+  {
+    id: "event_meteor_watch",
+    name: "Meteor Watch Orbit",
+    description:
+      "Event: high-inclination LEO optimized for meteor radiant observation.",
+    minDeltaV: 1100,
+    difficulty: "medium",
+    eventOnly: true,
+  },
+  {
+    id: "event_mars_rush",
+    name: "Mars Opposition Express",
+    description:
+      "Event: aggressive transfer window while Mars is near opposition.",
+    minDeltaV: 2600,
+    difficulty: "hard",
+    eventOnly: true,
+  },
+  {
+    id: "event_storm_rider",
+    name: "Storm Rider",
+    description:
+      "Event: solar-max patrol — ride elevated particle flux near Earth.",
+    minDeltaV: 1400,
+    difficulty: "medium",
+    eventOnly: true,
+  },
+  {
+    id: "event_eclipse_chase",
+    name: "Eclipse Chase",
+    description:
+      "Event: polar-ish LEO to maximize eclipse corridor science passes.",
+    minDeltaV: 1000,
+    difficulty: "medium",
+    eventOnly: true,
+  },
 ];
+
+/** Missions available right now (includes event-only when active). */
+export function getAvailableMissions(
+  activeEventMissionIds: MissionProfileId[] = []
+): MissionProfile[] {
+  return MISSION_PROFILES.filter(
+    (m) => !m.eventOnly || activeEventMissionIds.includes(m.id)
+  );
+}
 
 export function daysSinceEpoch(ms: number): number {
   return (ms - EPOCH_MS) / (SECONDS_PER_DAY * 1000);
@@ -267,6 +322,61 @@ export function createOrbitForMission(
         meanAnomaly0: 0,
         epochMs: launchMs,
         centralBody: "sun",
+      };
+    }
+    case "event_meteor_watch": {
+      const r = 6371 + 550;
+      return {
+        a: r,
+        e: 0.002,
+        i: (70 * Math.PI) / 180,
+        raan: earthAngle,
+        argPeri: 0,
+        meanAnomaly0: 0,
+        epochMs: launchMs,
+        centralBody: "earth",
+      };
+    }
+    case "event_mars_rush": {
+      const rp = 0.98 * AU_KM;
+      const ra = 1.55 * AU_KM;
+      const a = (rp + ra) / 2;
+      const e = (ra - rp) / (ra + rp);
+      return {
+        a,
+        e,
+        i: 0.04,
+        raan: earthAngle,
+        argPeri: earthAngle,
+        meanAnomaly0: 0,
+        epochMs: launchMs,
+        centralBody: "sun",
+      };
+    }
+    case "event_storm_rider": {
+      const r = 6371 + 800;
+      return {
+        a: r,
+        e: 0.01,
+        i: (98 * Math.PI) / 180,
+        raan: earthAngle,
+        argPeri: 0.2,
+        meanAnomaly0: 0,
+        epochMs: launchMs,
+        centralBody: "earth",
+      };
+    }
+    case "event_eclipse_chase": {
+      const r = 6371 + 450;
+      return {
+        a: r,
+        e: 0.001,
+        i: (88 * Math.PI) / 180,
+        raan: earthAngle + 0.4,
+        argPeri: 0,
+        meanAnomaly0: 0,
+        epochMs: launchMs,
+        centralBody: "earth",
       };
     }
   }

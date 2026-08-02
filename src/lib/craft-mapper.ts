@@ -19,6 +19,7 @@ export function rowToCraft(row: DbCraftRow): Craft {
     updatedAt: new Date(row.updated_at).getTime(),
     userId: row.user_id ?? undefined,
     commanderName: row.commander_name ?? undefined,
+    skinId: row.skin_id ?? undefined,
   };
 }
 
@@ -41,6 +42,7 @@ export function craftToRow(
       : null,
     last_sim_ms: craft.lastSimMs ?? null,
     notes: craft.notes ?? null,
+    skin_id: craft.skinId ?? null,
     updated_at: new Date(craft.updatedAt || Date.now()).toISOString(),
   };
 }

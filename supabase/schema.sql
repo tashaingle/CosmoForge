@@ -20,6 +20,7 @@ create table if not exists public.crafts (
 
 -- Migrate older installs
 alter table public.crafts add column if not exists commander_name text;
+alter table public.crafts add column if not exists skin_id text;
 
 create index if not exists crafts_user_id_idx on public.crafts (user_id);
 create index if not exists crafts_status_idx on public.crafts (status);
@@ -30,9 +31,22 @@ create index if not exists crafts_inflight_idx on public.crafts (status)
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text,
+  credits integer default 500,
+  unlocked_skin_ids text[] default array['default'],
+  equipped_skin_id text default 'default',
+  claimed_launch_rewards jsonb default '{}'::jsonb,
+  claimed_milestones text[] default '{}',
+  wallet_updated_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists credits integer default 500;
+alter table public.profiles add column if not exists unlocked_skin_ids text[] default array['default'];
+alter table public.profiles add column if not exists equipped_skin_id text default 'default';
+alter table public.profiles add column if not exists claimed_launch_rewards jsonb default '{}'::jsonb;
+alter table public.profiles add column if not exists claimed_milestones text[] default '{}';
+alter table public.profiles add column if not exists wallet_updated_at timestamptz;
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()

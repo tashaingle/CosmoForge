@@ -18,6 +18,8 @@ export interface Craft {
   userId?: string;
   /** Display name for multiplayer map */
   commanderName?: string;
+  /** Cosmetic skin id */
+  skinId?: string;
 }
 
 export interface FleetState {
@@ -42,4 +44,5 @@ export interface LiveCraftMarker {
   launchedAt?: number;
   lastSimMs?: number;
   isSelf?: boolean;
+  skinId?: string;
 }

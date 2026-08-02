@@ -11,6 +11,7 @@ interface Props {
   simMs: number;
   craftOrbit?: OrbitElements | null;
   craftName?: string;
+  craftSkinId?: string;
   focus: "system" | "craft" | PlanetId;
   otherCrafts?: LiveCraftMarker[];
   className?: string;
@@ -20,6 +21,7 @@ export function SolarSystemCanvas({
   simMs,
   craftOrbit,
   craftName,
+  craftSkinId,
   focus,
   otherCrafts,
   className,
@@ -36,6 +38,7 @@ export function SolarSystemCanvas({
             simMs={simMs}
             craftOrbit={craftOrbit}
             craftName={craftName}
+            craftSkinId={craftSkinId}
             focus={focus}
             otherCrafts={otherCrafts}
           />

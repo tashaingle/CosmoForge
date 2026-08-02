@@ -6,10 +6,12 @@ In **Supabase → SQL Editor**, run the full contents of [`schema.sql`](./schema
 
 This adds:
 
-- `commander_name` on crafts  
-- `profiles` table + signup trigger  
+- `commander_name` + `skin_id` on crafts  
+- `profiles` (display name + **credits / cosmetics wallet**) + signup trigger  
 - RLS so **inflight crafts are publicly readable** (shared map)  
 - Owners still fully manage their own crafts  
+
+Re-run after updates for economy / cosmetics columns.
 
 ## 2. Auth redirect URLs
 

@@ -1,7 +1,8 @@
-import { getSupabaseBrowser } from "./supabase";
+import { getSupabaseBrowser, type DbProfileEconomy } from "./supabase";
 import { craftToRow, rowToCraft } from "./craft-mapper";
 import type { Craft, LiveCraftMarker } from "./types";
 import type { OrbitElements, MissionProfileId } from "./orbital";
+import type { PlayerWallet } from "./economy";
 
 export async function fetchCloudFleet(userId: string): Promise<Craft[]> {
   const sb = getSupabaseBrowser();
@@ -77,7 +78,7 @@ export async function fetchLiveCrafts(
   const { data, error } = await sb
     .from("crafts")
     .select(
-      "id, name, commander_name, mission_id, orbit, launched_at, last_sim_ms, user_id"
+      "id, name, commander_name, mission_id, orbit, launched_at, last_sim_ms, user_id, skin_id"
     )
     .eq("status", "inflight")
     .not("orbit", "is", null)
@@ -105,6 +106,7 @@ export async function fetchLiveCrafts(
         : undefined,
       lastSimMs: (row.last_sim_ms as number) ?? undefined,
       isSelf: false,
+      skinId: (row.skin_id as string) || undefined,
     }));
 }
 
@@ -129,4 +131,51 @@ export async function setDisplayName(
     id: userId,
     display_name: displayName.slice(0, 40),
   });
+}
+
+export async function fetchCloudWallet(
+  userId: string
+): Promise<Partial<PlayerWallet> | null> {
+  const sb = getSupabaseBrowser();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("profiles")
+    .select(
+      "credits, unlocked_skin_ids, equipped_skin_id, claimed_launch_rewards, claimed_milestones, wallet_updated_at"
+    )
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) {
+    if (error) console.warn("[cloud-wallet] fetch", error.message);
+    return null;
+  }
+  const row = data as DbProfileEconomy;
+  return {
+    credits: row.credits ?? undefined,
+    unlockedSkinIds: row.unlocked_skin_ids ?? undefined,
+    equippedSkinId: row.equipped_skin_id ?? undefined,
+    claimedLaunchRewards: row.claimed_launch_rewards ?? undefined,
+    claimedMilestones: row.claimed_milestones ?? undefined,
+    updatedAt: row.wallet_updated_at
+      ? new Date(row.wallet_updated_at).getTime()
+      : undefined,
+  };
+}
+
+export async function pushWalletToCloud(
+  userId: string,
+  wallet: PlayerWallet
+): Promise<void> {
+  const sb = getSupabaseBrowser();
+  if (!sb) return;
+  const { error } = await sb.from("profiles").upsert({
+    id: userId,
+    credits: wallet.credits,
+    unlocked_skin_ids: wallet.unlockedSkinIds,
+    equipped_skin_id: wallet.equippedSkinId,
+    claimed_launch_rewards: wallet.claimedLaunchRewards,
+    claimed_milestones: wallet.claimedMilestones,
+    wallet_updated_at: new Date(wallet.updatedAt).toISOString(),
+  });
+  if (error) console.warn("[cloud-wallet] push", error.message);
 }

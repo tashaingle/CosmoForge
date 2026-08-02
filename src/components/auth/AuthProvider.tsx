@@ -13,9 +13,11 @@ import type { Session, User } from "@supabase/supabase-js";
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
 import {
   fetchCloudFleet,
+  fetchCloudWallet,
   getDisplayName,
   mergeFleets,
   migrateLocalToCloud,
+  pushWalletToCloud,
   setDisplayName,
 } from "@/lib/cloud-fleet";
 import {
@@ -24,6 +26,12 @@ import {
   setLocalCommanderName,
   getLocalCommanderName,
 } from "@/lib/storage";
+import {
+  loadWallet,
+  mergeWallets,
+  replaceWallet,
+  type PlayerWallet,
+} from "@/lib/economy";
 
 type AuthContextValue = {
   ready: boolean;
@@ -33,10 +41,13 @@ type AuthContextValue = {
   displayName: string;
   cloudSyncing: boolean;
   cloudSynced: boolean;
+  wallet: PlayerWallet;
   signInWithEmail: (email: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   updateDisplayName: (name: string) => Promise<void>;
   refreshCloudFleet: () => Promise<void>;
+  refreshWallet: () => void;
+  persistWallet: (w: PlayerWallet) => Promise<void>;
   syncContext: { userId?: string; commanderName?: string };
 };
 
@@ -49,11 +60,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [displayName, setDisplayNameState] = useState("Commander");
   const [cloudSyncing, setCloudSyncing] = useState(false);
   const [cloudSynced, setCloudSynced] = useState(false);
+  const [wallet, setWallet] = useState<PlayerWallet>(() =>
+    typeof window !== "undefined" ? loadWallet() : loadWallet()
+  );
+
+  const persistWallet = useCallback(
+    async (w: PlayerWallet) => {
+      replaceWallet(w);
+      setWallet({ ...w });
+      if (session?.user) {
+        await pushWalletToCloud(session.user.id, w);
+      }
+    },
+    [session?.user]
+  );
+
+  const refreshWallet = useCallback(() => {
+    setWallet(loadWallet());
+  }, []);
 
   const syncFleetForUser = useCallback(async (user: User) => {
     setCloudSyncing(true);
     try {
-      let name =
+      const name =
         (await getDisplayName(user.id)) ||
         user.user_metadata?.display_name ||
         user.email?.split("@")[0] ||
@@ -62,13 +91,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLocalCommanderName(name);
 
       const local = loadFleet().crafts;
-      // Push local crafts up, then pull full cloud list
       await migrateLocalToCloud(local, user.id, name);
       const cloud = await fetchCloudFleet(user.id);
       const merged = mergeFleets(local, cloud);
       replaceFleet(merged);
-      // Ensure merged state is fully on cloud
       await migrateLocalToCloud(merged, user.id, name);
+
+      // Wallet / cosmetics
+      const localW = loadWallet();
+      const cloudW = await fetchCloudWallet(user.id);
+      const mergedW = mergeWallets(localW, cloudW);
+      replaceWallet(mergedW);
+      setWallet(mergedW);
+      await pushWalletToCloud(user.id, mergedW);
+
       setCloudSynced(true);
     } catch (e) {
       console.warn("[auth] fleet sync failed", e);
@@ -82,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!configured) {
       setReady(true);
       setDisplayNameState(getLocalCommanderName());
+      setWallet(loadWallet());
       return;
     }
     const sb = getSupabaseBrowser();
@@ -168,10 +205,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       displayName,
       cloudSyncing,
       cloudSynced,
+      wallet,
       signInWithEmail,
       signOut,
       updateDisplayName,
       refreshCloudFleet,
+      refreshWallet,
+      persistWallet,
       syncContext: {
         userId: session?.user?.id,
         commanderName: displayName,
@@ -184,10 +224,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       displayName,
       cloudSyncing,
       cloudSynced,
+      wallet,
       signInWithEmail,
       signOut,
       updateDisplayName,
       refreshCloudFleet,
+      refreshWallet,
+      persistWallet,
     ]
   );
 

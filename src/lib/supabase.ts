@@ -41,6 +41,18 @@ export type DbCraftRow = {
   launched_at: string | null;
   last_sim_ms: number | null;
   notes: string | null;
+  skin_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type DbProfileEconomy = {
+  id: string;
+  display_name: string | null;
+  credits: number | null;
+  unlocked_skin_ids: string[] | null;
+  equipped_skin_id: string | null;
+  claimed_launch_rewards: Record<string, number> | null;
+  claimed_milestones: string[] | null;
+  wallet_updated_at: string | null;
 };

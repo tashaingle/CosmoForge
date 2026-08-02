@@ -12,10 +12,13 @@ import {
   periodDays,
 } from "@/lib/orbital";
 import { computeStats, formatDeltaV, formatMass } from "@/lib/ship";
-import { encodeShare, touchCraftSim } from "@/lib/storage";
+import { encodeShare, touchCraftSim, upsertCraft } from "@/lib/storage";
 import { fetchLiveCrafts } from "@/lib/cloud-fleet";
 import type { Craft, LiveCraftMarker } from "@/lib/types";
 import { InlineSpinner } from "@/components/ui/LoadingScreen";
+import { claimLaunchReward } from "@/lib/economy";
+import { getActiveSkyEvents } from "@/lib/sky-events";
+import { getSkin } from "@/lib/cosmetics";
 
 type Focus = "system" | "craft" | PlanetId;
 
@@ -25,7 +28,7 @@ interface Props {
 }
 
 export function MissionClient({ craft, readOnly = false }: Props) {
-  const { syncContext, configured } = useAuth();
+  const { syncContext, configured, persistWallet, wallet } = useAuth();
   const launchMs = craft.launchedAt ?? Date.now();
   const [simMs, setSimMs] = useState(
     () => craft.lastSimMs ?? craft.launchedAt ?? Date.now()
@@ -37,6 +40,9 @@ export function MissionClient({ craft, readOnly = false }: Props) {
   const [copied, setCopied] = useState(false);
   const [others, setOthers] = useState<LiveCraftMarker[]>([]);
   const [liveLoading, setLiveLoading] = useState(false);
+  const [rewardToast, setRewardToast] = useState<string | null>(null);
+  const activeEvents = useMemo(() => getActiveSkyEvents(), []);
+  const skin = getSkin(craft.skinId || wallet.equippedSkinId);
 
   useEffect(() => {
     if (paused) return;
@@ -80,6 +86,25 @@ export function MissionClient({ craft, readOnly = false }: Props) {
       clearInterval(id);
     };
   }, [configured, craft.id]);
+
+  // Claim launch credits once
+  useEffect(() => {
+    if (readOnly || !craft.missionId || craft.status !== "inflight") return;
+    // Ensure skin on craft for map
+    if (!craft.skinId && wallet.equippedSkinId) {
+      upsertCraft(
+        { ...craft, skinId: wallet.equippedSkinId },
+        syncContext
+      );
+    }
+    const result = claimLaunchReward(craft.id, craft.missionId);
+    void persistWallet(result.wallet);
+    if (!result.alreadyClaimed && result.gained > 0) {
+      setRewardToast(`+✦ ${result.gained} credits for launch`);
+      const t = window.setTimeout(() => setRewardToast(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [craft.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stats = useMemo(() => computeStats(craft.partIds), [craft.partIds]);
   const mission = MISSION_PROFILES.find((m) => m.id === craft.missionId);
@@ -129,11 +154,29 @@ export function MissionClient({ craft, readOnly = false }: Props) {
           simMs={simMs}
           craftOrbit={orbit}
           craftName={craft.name}
+          craftSkinId={craft.skinId || skin.id}
           focus={focus}
           otherCrafts={others}
           className="h-full w-full"
         />
       </div>
+
+      {rewardToast && (
+        <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-full border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-100 shadow-lg backdrop-blur">
+          {rewardToast}
+        </div>
+      )}
+
+      {activeEvents.length > 0 && !readOnly && (
+        <div className="absolute left-2 right-2 top-14 z-10 sm:left-auto sm:right-4 sm:top-16 sm:max-w-xs">
+          <div className="rounded-xl border border-emerald-400/30 bg-slate-950/80 px-3 py-2 text-[11px] text-emerald-100 backdrop-blur sm:text-xs">
+            <span className="font-semibold text-emerald-300">Sky event</span>
+            <span className="mt-0.5 block truncate">
+              {activeEvents.map((e) => e.name).join(" · ")}
+            </span>
+          </div>
+        </div>
+      )}
 
       <header className="relative z-10 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-950/75 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">

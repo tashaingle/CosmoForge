@@ -53,8 +53,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | Share (URL snapshot or Supabase short link) | ✅ |
 | Other players’ craft on the map | ✅ |
 | Landing polish + mobile layout | ✅ |
-| Economy / AI co-pilot / AR | ⏳ |
-| Live JPL ephemeris | ⏳ |
+| Sky events (real calendar windows) | ✅ |
+| Credits economy + cosmetics shop | ✅ |
+| AI co-pilot / AR / JPL live ephemeris | ⏳ |
 
 ## How to play
 

@@ -57,7 +57,7 @@ export function setLocalCommanderName(name: string): void {
   localStorage.setItem(COMMANDER_KEY, name.slice(0, 40));
 }
 
-export function createCraft(name = "New Probe"): Craft {
+export function createCraft(name = "New Probe", skinId?: string): Craft {
   const now = Date.now();
   return {
     id: nanoid(10),
@@ -67,6 +67,7 @@ export function createCraft(name = "New Probe"): Craft {
     updatedAt: now,
     status: "design",
     commanderName: getLocalCommanderName(),
+    skinId: skinId || "default",
   };
 }
 
@@ -138,6 +139,7 @@ export function launchCraft(
       craft.commanderName ||
       sync?.commanderName ||
       getLocalCommanderName(),
+    skinId: craft.skinId || "default",
   };
   upsertCraft(next, sync);
   return next;
