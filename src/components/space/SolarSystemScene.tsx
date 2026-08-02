@@ -10,12 +10,14 @@ import {
   planetPositionAU,
   type OrbitElements,
 } from "@/lib/orbital";
+import type { LiveCraftMarker } from "@/lib/types";
 
 interface SolarSystemSceneProps {
   simMs: number;
   craftOrbit?: OrbitElements | null;
   craftName?: string;
   focus: "system" | "craft" | PlanetId;
+  otherCrafts?: LiveCraftMarker[];
 }
 
 function OrbitRing({ radius, color }: { radius: number; color: string }) {
@@ -29,7 +31,13 @@ function OrbitRing({ radius, color }: { radius: number; color: string }) {
   }, [radius]);
 
   return (
-    <Line points={points} color={color} lineWidth={0.5} transparent opacity={0.25} />
+    <Line
+      points={points}
+      color={color}
+      lineWidth={0.5}
+      transparent
+      opacity={0.25}
+    />
   );
 }
 
@@ -62,7 +70,9 @@ function PlanetBody({
       )}
       {def.id === "saturn" && (
         <mesh rotation={[Math.PI / 2.4, 0, 0.2]}>
-          <ringGeometry args={[def.visualRadius * 1.3, def.visualRadius * 2.1, 64]} />
+          <ringGeometry
+            args={[def.visualRadius * 1.3, def.visualRadius * 2.1, 64]}
+          />
           <meshBasicMaterial
             color="#d4c4a0"
             side={THREE.DoubleSide}
@@ -73,7 +83,7 @@ function PlanetBody({
       )}
       {showLabel && (
         <Html distanceFactor={8} style={{ pointerEvents: "none" }}>
-          <div className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-cyan-100 whitespace-nowrap border border-white/10">
+          <div className="whitespace-nowrap rounded border border-white/10 bg-black/60 px-1.5 py-0.5 text-[10px] text-cyan-100">
             {def.name}
           </div>
         </Html>
@@ -86,10 +96,18 @@ function CraftMarker({
   orbit,
   simMs,
   name,
+  subtitle,
+  color = "#22d3ee",
+  size = 0.018,
+  showTrail = true,
 }: {
   orbit: OrbitElements;
   simMs: number;
   name: string;
+  subtitle?: string;
+  color?: string;
+  size?: number;
+  showTrail?: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const trail = useRef<THREE.Vector3[]>([]);
@@ -98,49 +116,73 @@ function CraftMarker({
     if (!ref.current) return;
     const p = craftScenePosition(orbit, simMs);
     ref.current.position.set(p.x, p.y, p.z);
-    trail.current.push(new THREE.Vector3(p.x, p.y, p.z));
-    if (trail.current.length > 80) trail.current.shift();
+    if (showTrail) {
+      trail.current.push(new THREE.Vector3(p.x, p.y, p.z));
+      if (trail.current.length > 60) trail.current.shift();
+    }
   });
 
-  const trailPoints = trail.current.length > 1 ? trail.current : [new THREE.Vector3()];
+  const trailPoints =
+    trail.current.length > 1 ? trail.current : [new THREE.Vector3()];
 
   return (
     <>
       <group ref={ref}>
         <mesh>
-          <octahedronGeometry args={[0.018, 0]} />
+          <octahedronGeometry args={[size, 0]} />
           <meshStandardMaterial
             color="#f8fafc"
-            emissive="#22d3ee"
+            emissive={color}
             emissiveIntensity={0.9}
           />
         </mesh>
         <mesh>
-          <sphereGeometry args={[0.04, 16, 16]} />
-          <meshBasicMaterial color="#22d3ee" transparent opacity={0.15} />
+          <sphereGeometry args={[size * 2.2, 16, 16]} />
+          <meshBasicMaterial color={color} transparent opacity={0.15} />
         </mesh>
-        <Html distanceFactor={6} position={[0.03, 0.04, 0]}>
-          <div className="rounded-md bg-cyan-950/80 px-2 py-1 text-[11px] text-cyan-50 border border-cyan-400/40 shadow-lg whitespace-nowrap">
-            ✦ {name}
+        <Html distanceFactor={6} position={[size * 1.6, size * 2.2, 0]}>
+          <div
+            className="max-w-[140px] truncate whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] shadow-lg sm:text-[11px]"
+            style={{
+              background: `${color}22`,
+              borderColor: `${color}66`,
+              color: "#f8fafc",
+            }}
+          >
+            {name}
+            {subtitle ? (
+              <span className="block text-[9px] opacity-70">{subtitle}</span>
+            ) : null}
           </div>
         </Html>
       </group>
-      {trail.current.length > 2 && (
-        <Line points={trailPoints} color="#22d3ee" lineWidth={1} transparent opacity={0.45} />
+      {showTrail && trail.current.length > 2 && (
+        <Line
+          points={trailPoints}
+          color={color}
+          lineWidth={1}
+          transparent
+          opacity={0.4}
+        />
       )}
     </>
   );
 }
 
-function CraftOrbitPreview({ orbit, simMs }: { orbit: OrbitElements; simMs: number }) {
+function CraftOrbitPreview({
+  orbit,
+  simMs,
+}: {
+  orbit: OrbitElements;
+  simMs: number;
+}) {
   const points = useMemo(() => {
     const pts: THREE.Vector3[] = [];
     const samples = 96;
-    // Sample one orbital period worth of positions from current epoch
     const spanMs =
       orbit.centralBody === "earth"
-        ? 90 * 60 * 1000 // ~90 min LEO visual ring
-        : 200 * 24 * 3600 * 1000; // ~200 days heliocentric
+        ? 90 * 60 * 1000
+        : 200 * 24 * 3600 * 1000;
     for (let i = 0; i <= samples; i++) {
       const t = simMs + (i / samples) * spanMs;
       const p = craftScenePosition(orbit, t);
@@ -149,7 +191,15 @@ function CraftOrbitPreview({ orbit, simMs }: { orbit: OrbitElements; simMs: numb
     return pts;
   }, [orbit, simMs]);
 
-  return <Line points={points} color="#67e8f9" lineWidth={1} transparent opacity={0.35} />;
+  return (
+    <Line
+      points={points}
+      color="#67e8f9"
+      lineWidth={1}
+      transparent
+      opacity={0.35}
+    />
+  );
 }
 
 function CameraRig({
@@ -190,17 +240,28 @@ function CameraRig({
   );
 }
 
+const OTHER_COLORS = ["#a78bfa", "#f472b6", "#fbbf24", "#34d399", "#60a5fa"];
+
 export function SolarSystemScene({
   simMs,
   craftOrbit,
   craftName = "Craft",
   focus,
+  otherCrafts = [],
 }: SolarSystemSceneProps) {
   return (
     <>
       <color attach="background" args={["#020617"]} />
       <ambientLight intensity={0.12} />
-      <Stars radius={80} depth={40} count={5000} factor={3} saturation={0} fade speed={0.4} />
+      <Stars
+        radius={80}
+        depth={40}
+        count={4500}
+        factor={3}
+        saturation={0}
+        fade
+        speed={0.4}
+      />
 
       {PLANETS.filter((p) => p.id !== "sun").map((p) => (
         <OrbitRing key={p.id} radius={p.a} color="#334155" />
@@ -212,6 +273,19 @@ export function SolarSystemScene({
           planetId={p.id}
           simMs={simMs}
           showLabel={p.id !== "sun"}
+        />
+      ))}
+
+      {otherCrafts.map((oc, i) => (
+        <CraftMarker
+          key={oc.id}
+          orbit={oc.orbit}
+          simMs={simMs}
+          name={oc.name}
+          subtitle={oc.commanderName}
+          color={OTHER_COLORS[i % OTHER_COLORS.length]}
+          size={0.012}
+          showTrail={false}
         />
       ))}
 

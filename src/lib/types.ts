@@ -14,6 +14,10 @@ export interface Craft {
   /** Wall-clock when sim clock was last advanced / saved */
   lastSimMs?: number;
   notes?: string;
+  /** Cloud owner (when synced) */
+  userId?: string;
+  /** Display name for multiplayer map */
+  commanderName?: string;
 }
 
 export interface FleetState {
@@ -26,4 +30,16 @@ export interface SharePayload {
   v: 1;
   craft: Craft;
   exportedAt: number;
+}
+
+/** Other players' craft on the shared map */
+export interface LiveCraftMarker {
+  id: string;
+  name: string;
+  commanderName: string;
+  missionId?: MissionProfileId;
+  orbit: OrbitElements;
+  launchedAt?: number;
+  lastSimMs?: number;
+  isSelf?: boolean;
 }

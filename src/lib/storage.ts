@@ -4,8 +4,13 @@ import type { Craft, FleetState, SharePayload } from "./types";
 import type { MissionProfileId } from "./orbital";
 import { createOrbitForMission } from "./orbital";
 import { computeStats } from "./ship";
+import {
+  deleteCraftFromCloud,
+  pushCraftToCloud,
+} from "./cloud-fleet";
 
 const STORAGE_KEY = "cosmoforge-fleet-v1";
+const COMMANDER_KEY = "cosmoforge-commander-name";
 
 function emptyFleet(): FleetState {
   return { version: 1, crafts: [], selectedCraftId: null };
@@ -29,6 +34,29 @@ export function saveFleet(state: FleetState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+export function replaceFleet(crafts: Craft[], selectedCraftId?: string | null): FleetState {
+  const fleet: FleetState = {
+    version: 1,
+    crafts,
+    selectedCraftId:
+      selectedCraftId !== undefined
+        ? selectedCraftId
+        : crafts[0]?.id ?? null,
+  };
+  saveFleet(fleet);
+  return fleet;
+}
+
+export function getLocalCommanderName(): string {
+  if (typeof window === "undefined") return "Commander";
+  return localStorage.getItem(COMMANDER_KEY) || "Commander";
+}
+
+export function setLocalCommanderName(name: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(COMMANDER_KEY, name.slice(0, 40));
+}
+
 export function createCraft(name = "New Probe"): Craft {
   const now = Date.now();
   return {
@@ -38,17 +66,34 @@ export function createCraft(name = "New Probe"): Craft {
     createdAt: now,
     updatedAt: now,
     status: "design",
+    commanderName: getLocalCommanderName(),
   };
 }
 
-export function upsertCraft(craft: Craft): FleetState {
+export type SyncContext = {
+  userId?: string | null;
+  commanderName?: string | null;
+};
+
+export function upsertCraft(craft: Craft, sync?: SyncContext): FleetState {
   const fleet = loadFleet();
   const idx = fleet.crafts.findIndex((c) => c.id === craft.id);
-  const next = { ...craft, updatedAt: Date.now() };
+  const next: Craft = {
+    ...craft,
+    updatedAt: Date.now(),
+    commanderName:
+      craft.commanderName ||
+      sync?.commanderName ||
+      getLocalCommanderName(),
+  };
   if (idx >= 0) fleet.crafts[idx] = next;
   else fleet.crafts.unshift(next);
   fleet.selectedCraftId = next.id;
   saveFleet(fleet);
+
+  if (sync?.userId) {
+    void pushCraftToCloud(next, sync.userId, sync.commanderName || undefined);
+  }
   return fleet;
 }
 
@@ -56,19 +101,23 @@ export function getCraft(id: string): Craft | undefined {
   return loadFleet().crafts.find((c) => c.id === id);
 }
 
-export function deleteCraft(id: string): FleetState {
+export function deleteCraft(id: string, sync?: SyncContext): FleetState {
   const fleet = loadFleet();
   fleet.crafts = fleet.crafts.filter((c) => c.id !== id);
   if (fleet.selectedCraftId === id) {
     fleet.selectedCraftId = fleet.crafts[0]?.id ?? null;
   }
   saveFleet(fleet);
+  if (sync?.userId) {
+    void deleteCraftFromCloud(id);
+  }
   return fleet;
 }
 
 export function launchCraft(
   craftId: string,
-  missionId: MissionProfileId
+  missionId: MissionProfileId,
+  sync?: SyncContext
 ): Craft | null {
   const craft = getCraft(craftId);
   if (!craft) return null;
@@ -85,22 +134,29 @@ export function launchCraft(
     launchedAt,
     lastSimMs: launchedAt,
     updatedAt: launchedAt,
+    commanderName:
+      craft.commanderName ||
+      sync?.commanderName ||
+      getLocalCommanderName(),
   };
-  upsertCraft(next);
+  upsertCraft(next, sync);
   return next;
 }
 
 /** Advance craft sim clock for offline persistence display */
-export function touchCraftSim(craftId: string, simMs: number): void {
+export function touchCraftSim(
+  craftId: string,
+  simMs: number,
+  sync?: SyncContext
+): void {
   const craft = getCraft(craftId);
   if (!craft || craft.status !== "inflight") return;
-  upsertCraft({ ...craft, lastSimMs: simMs });
+  upsertCraft({ ...craft, lastSimMs: simMs }, sync);
 }
 
 export function encodeShare(craft: Craft): string {
   const payload: SharePayload = { v: 1, craft, exportedAt: Date.now() };
   const json = JSON.stringify(payload);
-  // URL-safe base64
   const b64 =
     typeof window !== "undefined"
       ? btoa(unescape(encodeURIComponent(json)))

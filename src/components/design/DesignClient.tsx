@@ -6,21 +6,31 @@ import { ShipBuilder } from "@/components/ship/ShipBuilder";
 import { getCraft, upsertCraft } from "@/lib/storage";
 import { computeStats } from "@/lib/ship";
 import type { Craft } from "@/lib/types";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 
 export function DesignClient({ craftId }: { craftId: string }) {
-  const [craft, setCraft] = useState<Craft | null>(null);
+  const { ready, syncContext } = useAuth();
+  const [craft, setCraft] = useState<Craft | null | undefined>(undefined);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const c = getCraft(craftId);
-    setCraft(c ?? null);
-  }, [craftId]);
+    if (!ready) return;
+    setCraft(getCraft(craftId) ?? null);
+  }, [craftId, ready]);
+
+  if (!ready || craft === undefined) {
+    return <LoadingScreen label="Loading design…" />;
+  }
 
   if (craft === null) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-950 text-slate-300">
-        <p>Craft not found in this browser’s hangar.</p>
-        <Link href="/" className="text-cyan-400 hover:underline">
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-slate-950 px-4 text-center text-slate-300">
+        <p>Craft not found in this hangar.</p>
+        <p className="text-sm text-slate-500">
+          Sign in if it lives on another device.
+        </p>
+        <Link href="/#hangar" className="text-cyan-400 hover:underline">
           Back to hangar
         </Link>
       </div>
@@ -29,7 +39,7 @@ export function DesignClient({ craftId }: { craftId: string }) {
 
   if (craft.status === "inflight") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-950 text-slate-300">
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-slate-950 text-slate-300">
         <p>This craft is already in flight.</p>
         <Link
           href={`/mission/${craft.id}`}
@@ -44,21 +54,24 @@ export function DesignClient({ craftId }: { craftId: string }) {
   const stats = computeStats(craft.partIds);
 
   function save(next: Craft) {
-    upsertCraft(next);
+    upsertCraft(next, syncContext);
     setCraft(next);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="border-b border-white/10 bg-slate-950/90 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-sm text-slate-400 hover:text-cyan-300">
+    <div className="min-h-[100dvh] bg-slate-950 text-slate-100">
+      <div className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 px-3 py-2.5 backdrop-blur sm:px-4 sm:py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/#hangar"
+              className="text-sm text-slate-400 hover:text-cyan-300"
+            >
               ← Hangar
             </Link>
-            <h1 className="text-lg font-semibold">Ship designer</h1>
+            <h1 className="text-base font-semibold sm:text-lg">Ship designer</h1>
             {saved && (
               <span className="text-xs text-emerald-400">Saved</span>
             )}
@@ -69,7 +82,7 @@ export function DesignClient({ craftId }: { craftId: string }) {
               onClick={() => save(craft)}
               className="rounded-lg border border-white/15 px-3 py-1.5 text-sm hover:bg-white/5"
             >
-              Save design
+              Save
             </button>
             <Link
               href={stats.launchReady ? `/launch/${craft.id}` : "#"}
@@ -83,13 +96,13 @@ export function DesignClient({ craftId }: { craftId: string }) {
                   : "cursor-not-allowed bg-slate-700 text-slate-400"
               }`}
             >
-              Proceed to launch
+              Launch
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-3 py-6 sm:px-4 sm:py-8">
         <ShipBuilder
           name={craft.name}
           partIds={craft.partIds}

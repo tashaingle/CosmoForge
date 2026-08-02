@@ -44,16 +44,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Feature | Status |
 |--------|--------|
-| Hangar + fleet (localStorage) | ✅ |
+| Hangar + fleet (local + cloud) | ✅ |
+| Magic-link auth (Supabase) | ✅ |
 | Modular ship builder (mass, power, Δv) | ✅ |
 | Missions (LEO, lunar, Mars, belt) | ✅ |
 | 3D solar system + craft | ✅ |
 | Time acceleration + offline catch-up | ✅ |
 | Share (URL snapshot or Supabase short link) | ✅ |
-| Multiplayer / economy / AI co-pilot | ⏳ |
+| Other players’ craft on the map | ✅ |
+| Landing polish + mobile layout | ✅ |
+| Economy / AI co-pilot / AR | ⏳ |
 | Live JPL ephemeris | ⏳ |
-| Auth-backed cloud hangar | ⏳ |
-| Mobile / AR | ⏳ |
 
 ## How to play
 
