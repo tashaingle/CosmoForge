@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { fetchCloudFleet } from "@/lib/cloud-fleet";
 import { upsertCraft } from "@/lib/storage";
+import { trackDailyOpenMission } from "@/lib/daily";
 
 export function MissionPageClient({ craftId }: { craftId: string }) {
   const { ready, user, syncContext } = useAuth();
@@ -16,6 +17,11 @@ export function MissionPageClient({ craftId }: { craftId: string }) {
 
   useEffect(() => {
     if (!ready) return;
+    try {
+      trackDailyOpenMission();
+    } catch {
+      /* ignore */
+    }
 
     async function load() {
       let c = getCraft(craftId);

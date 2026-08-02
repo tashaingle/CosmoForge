@@ -42,6 +42,15 @@ export function discoverBody(
   }
   p.discovered[bodyId] = Date.now();
   savePassport(p);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { trackDailyStamp } = require("./daily") as {
+      trackDailyStamp: () => void;
+    };
+    trackDailyStamp();
+  } catch {
+    /* ignore */
+  }
   return { passport: p, isNew: true };
 }
 

@@ -169,6 +169,16 @@ export function claimObjectiveReward(
   wallet.claimedMilestones.push(key);
   wallet.credits += amount;
   saveWallet(wallet);
+  try {
+    // dynamic to avoid circular import issues at module init
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { trackDailyObjective } = require("./daily") as {
+      trackDailyObjective: () => void;
+    };
+    trackDailyObjective();
+  } catch {
+    /* ignore */
+  }
   return { wallet, gained: amount, alreadyClaimed: false };
 }
 

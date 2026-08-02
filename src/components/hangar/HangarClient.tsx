@@ -20,6 +20,7 @@ import { SkyEventsPanel } from "@/components/events/SkyEventsPanel";
 import { CosmeticsShop } from "@/components/shop/CosmeticsShop";
 import { MarketplacePanel } from "@/components/market/MarketplacePanel";
 import { SolarPassportPanel } from "@/components/passport/SolarPassportPanel";
+import { DailyCommandCentre } from "@/components/daily/DailyCommandCentre";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
 import type { PlayerWallet } from "@/lib/economy";
@@ -93,8 +94,13 @@ export function HangarClient() {
 
       <SiteHeader />
 
+      {/* Daily loop — why come back */}
+      <div className="relative pt-6">
+        <DailyCommandCentre />
+      </div>
+
       {/* Hero — App Store style */}
-      <section className="relative mx-auto max-w-6xl px-4 pb-10 pt-8 sm:pb-14 sm:pt-14">
+      <section className="relative mx-auto max-w-6xl px-4 pb-10 pt-2 sm:pb-14 sm:pt-6">
         <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-400/90">
@@ -116,10 +122,16 @@ export function HangarClient() {
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <a
+                href="#today"
+                className="rounded-2xl bg-cyan-500 px-6 py-3.5 text-center text-sm font-semibold text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:bg-cyan-400"
+              >
+                Today’s briefing
+              </a>
               <button
                 type="button"
                 onClick={onNew}
-                className="rounded-2xl bg-cyan-500 px-6 py-3.5 text-center text-sm font-semibold text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:bg-cyan-400"
+                className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-6 py-3.5 text-center text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
               >
                 + New spacecraft
               </button>

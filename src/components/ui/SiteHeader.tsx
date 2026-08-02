@@ -51,6 +51,12 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
               ✦ {wallet.credits}
             </a>
             <a
+              href="/#today"
+              className="hidden rounded-lg border border-white/10 px-2 py-1 text-[11px] text-slate-300 hover:bg-white/5 sm:inline sm:text-xs"
+            >
+              Today
+            </a>
+            <a
               href="/#market"
               className="hidden rounded-lg border border-white/10 px-2 py-1 text-[11px] text-slate-300 hover:bg-white/5 sm:inline sm:text-xs"
             >

@@ -142,6 +142,15 @@ export function launchCraft(
     skinId: craft.skinId || "default",
   };
   upsertCraft(next, sync);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { trackDailyLaunch } = require("./daily") as {
+      trackDailyLaunch: () => void;
+    };
+    trackDailyLaunch();
+  } catch {
+    /* ignore */
+  }
   return next;
 }
 

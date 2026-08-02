@@ -561,6 +561,15 @@ export function performScan(
   state.scanCount += 1;
   state.lastScanSimMs = simMs;
   saveObjectiveState(craftId, state);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { trackDailyScan } = require("./daily") as {
+      trackDailyScan: () => void;
+    };
+    trackDailyScan();
+  } catch {
+    /* ignore */
+  }
   return {
     state,
     ok: true,
