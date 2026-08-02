@@ -4,10 +4,15 @@
  */
 
 import { nanoid } from "nanoid";
-import type { MissionProfileId } from "./orbital";
-import { MISSION_PROFILES, getAvailableMissions } from "./orbital";
+import {
+  MISSION_PROFILES,
+  createOrbitForMission,
+  getAvailableMissions,
+  type MissionProfileId,
+} from "./orbital";
 import { computeStats } from "./ship";
 import {
+  getCraft,
   getLocalCommanderName,
   launchCraft,
   upsertCraft,
@@ -315,14 +320,21 @@ export interface QuickLaunchResult {
 export function quickLaunch(
   presetId: PresetId,
   sync?: SyncContext,
-  options?: { name?: string; personalityId?: PersonalityId }
+  options?: {
+    name?: string;
+    personalityId?: PersonalityId;
+    /** Deliberately under-equipped — funny, risky, rare outcomes */
+    absurd?: boolean;
+    /** Base new probe on a returned companion */
+    lineageParentId?: string;
+  }
 ): QuickLaunchResult {
   const preset = getPreset(presetId);
   if (!isPresetUnlocked(presetId)) {
     return { ok: false, error: "That odd job is still locked." };
   }
   const check = presetIsReady(preset);
-  if (!check.ok) {
+  if (!check.ok && !options?.absurd) {
     return { ok: false, error: check.reason ?? "Preset not ready" };
   }
 
@@ -333,10 +345,32 @@ export function quickLaunch(
   const personality = getPersonality(personalityId);
   const name = options?.name?.trim() || generateProbeName(seed);
 
+  // Absurd: strip tanks / use cubesat only — may still "launch" narratively
+  let partIds = [...preset.partIds];
+  let missionId = preset.missionId;
+  if (options?.absurd) {
+    partIds = ["bus_cubesat", "solar_small", "chem_small", "tank_s", "antenna_s"];
+    missionId = "leo";
+  }
+
+  let lineageNote: string | undefined;
+  let parentScars: Craft["scarIds"] = [];
+  if (options?.lineageParentId) {
+    const parent = getCraft(options.lineageParentId);
+    if (parent) {
+      lineageNote = `Grandchild energy of ${parent.name}${
+        parent.scarIds?.length
+          ? ` (${parent.scarIds.length} scars inherited in spirit)`
+          : ""
+      }`;
+      parentScars = [...(parent.scarIds ?? [])].slice(0, 1);
+    }
+  }
+
   const craft: Craft = {
     id: nanoid(10),
     name,
-    partIds: [...preset.partIds],
+    partIds,
     createdAt: now,
     updatedAt: now,
     status: "design",
@@ -344,14 +378,39 @@ export function quickLaunch(
     skinId: wallet.equippedSkinId || "default",
     personalityId,
     personalityVibe: personality.vibe,
-    scarIds: [],
+    scarIds: parentScars,
     pings: [],
     cargoLootIds: [],
     presetId: preset.id,
+    absurdLaunch: !!options?.absurd,
+    lineageParentId: options?.lineageParentId,
+    lineageNote,
+    relationship: 0,
+    voyagesCompleted: 0,
   };
 
   upsertCraft(craft, sync);
-  const launched = launchCraft(craft.id, preset.missionId, sync);
+
+  // Force launch even if absurd stats would fail rocket equation gates
+  let launched: Craft | null = null;
+  if (options?.absurd) {
+    const launchedAt = now;
+    const orbit = createOrbitForMission(missionId, launchedAt, 500);
+    launched = {
+      ...craft,
+      status: "inflight",
+      missionId,
+      orbit,
+      launchedAt,
+      lastSimMs: launchedAt,
+      expectedReturnAt: launchedAt + voyageDurationMs(missionId),
+      readyToReturn: false,
+    };
+    upsertCraft(launched, sync);
+  } else {
+    launched = launchCraft(craft.id, missionId, sync);
+  }
+
   if (!launched) {
     return { ok: false, error: "Launch failed — check design requirements." };
   }
@@ -360,13 +419,18 @@ export function quickLaunch(
     ...launched,
     personalityId,
     personalityVibe: personality.vibe,
+    absurdLaunch: !!options?.absurd,
+    lineageNote,
+    scarIds: parentScars,
     expectedReturnAt:
-      (launched.launchedAt ?? now) + voyageDurationMs(preset.missionId),
+      (launched.launchedAt ?? now) + voyageDurationMs(missionId),
     pings: [
       {
         id: "depart",
         atMs: launched.launchedAt ?? now,
-        text: `${name} is away. ${personality.vibe}`,
+        text: options?.absurd
+          ? `${name} is away on a deliberately bad idea. ${personality.vibe}`
+          : `${name} is away. ${personality.vibe}`,
         kind: "chat",
       },
     ],

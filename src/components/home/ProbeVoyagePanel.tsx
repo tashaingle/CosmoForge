@@ -15,11 +15,17 @@ import { getPersonality, getScar } from "@/lib/probe-personality";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { DebriefModal } from "./DebriefModal";
 import { collectionStats } from "@/lib/probe-loot";
+import { retireProbe } from "@/lib/probe-memorial";
+import { bondLabel } from "@/lib/probe-relationship";
+import { quickLaunch } from "@/lib/quick-launch";
+import { useRouter } from "next/navigation";
 
 export function ProbeVoyagePanel() {
   const { syncContext } = useAuth();
+  const router = useRouter();
   const [inflight, setInflight] = useState<Craft[]>([]);
   const [complete, setComplete] = useState<Craft[]>([]);
+  const [lost, setLost] = useState<Craft[]>([]);
   const [fresh, setFresh] = useState<
     { craftId: string; name: string; text: string }[]
   >([]);
@@ -37,6 +43,7 @@ export function ProbeVoyagePanel() {
     setComplete(
       fleet.crafts.filter((c) => c.status === "complete" && c.lastDebrief)
     );
+    setLost(fleet.crafts.filter((c) => c.status === "lost"));
     setColl(collectionStats());
   }, [syncContext]);
 
@@ -59,6 +66,31 @@ export function ProbeVoyagePanel() {
 
   function onReread(c: Craft) {
     if (c.lastDebrief) setDebrief(c.lastDebrief);
+  }
+
+  function onRetire(c: Craft) {
+    const plaque = window.prompt(
+      `Plaque for ${c.name}?`,
+      `${c.name} — flew ${c.voyagesCompleted ?? 0} voyages, came home weird.`
+    );
+    if (plaque === null) return;
+    const res = retireProbe(c.id, plaque || undefined, syncContext);
+    if (!res.ok) {
+      setErr(res.error ?? "Could not retire");
+      return;
+    }
+    refresh();
+  }
+
+  function onLineage(parent: Craft) {
+    const res = quickLaunch("leo_scout", syncContext, {
+      lineageParentId: parent.id,
+    });
+    if (!res.ok || !res.craft) {
+      setErr(res.error ?? "Lineage launch failed");
+      return;
+    }
+    router.push(`/mission/${res.craft.id}`);
   }
 
   // Hidden dev aid: double-click header to force first inflight ready
@@ -145,6 +177,14 @@ export function ProbeVoyagePanel() {
                         <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase text-slate-300">
                           {personality.label}
                         </span>
+                        <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] text-violet-200">
+                          {bondLabel(c.relationship)}
+                        </span>
+                        {c.absurdLaunch && (
+                          <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-200">
+                            Bad idea
+                          </span>
+                        )}
                         {ready && (
                           <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                             Ready to come home
@@ -213,22 +253,66 @@ export function ProbeVoyagePanel() {
           </ul>
         )}
 
+        {lost.length > 0 && (
+          <div className="rounded-2xl border border-rose-400/25 bg-rose-950/20 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-300">
+              Silent · last messages
+            </p>
+            <ul className="mt-2 space-y-2">
+              {lost.map((c) => (
+                <li key={c.id} className="text-sm text-rose-50/90">
+                  <span className="font-medium text-rose-200">{c.name}:</span>{" "}
+                  {c.lastMessage ?? "…"}
+                  <button
+                    type="button"
+                    onClick={() => onRetire(c)}
+                    className="ml-2 text-xs text-slate-400 underline hover:text-white"
+                  >
+                    Memorial
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {complete.length > 0 && (
           <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
               Companions who made it back
             </p>
-            <ul className="mt-2 flex flex-wrap gap-2">
+            <ul className="mt-2 space-y-2">
               {complete.slice(0, 12).map((c) => (
-                <button
+                <li
                   key={c.id}
-                  type="button"
-                  onClick={() => onReread(c)}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 hover:border-cyan-400/30 hover:text-cyan-100"
+                  className="flex flex-wrap items-center gap-2 text-xs"
                 >
-                  {c.name}
-                  {(c.scarIds?.length ?? 0) > 0 ? " · scarred" : ""}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onReread(c)}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:border-cyan-400/30 hover:text-cyan-100"
+                  >
+                    {c.name}
+                    {(c.scarIds?.length ?? 0) > 0 ? " · scarred" : ""}
+                    {c.relationship != null
+                      ? ` · ${bondLabel(c.relationship)}`
+                      : ""}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onLineage(c)}
+                    className="text-violet-300/90 hover:underline"
+                  >
+                    Launch descendant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRetire(c)}
+                    className="text-slate-500 hover:underline"
+                  >
+                    Retire
+                  </button>
+                </li>
               ))}
             </ul>
           </div>

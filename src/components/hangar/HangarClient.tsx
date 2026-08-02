@@ -27,6 +27,8 @@ import {
 } from "@/components/home/FleetStatusPanel";
 import { DailyQuestCompact } from "@/components/home/DailyQuestCompact";
 import { ProbeVoyagePanel } from "@/components/home/ProbeVoyagePanel";
+import { CodexPanel } from "@/components/home/CodexPanel";
+import { MemorialPanel } from "@/components/home/MemorialPanel";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
 import type { PlayerWallet } from "@/lib/economy";
@@ -216,6 +218,9 @@ export function HangarClient() {
 
         {/* Daily quest — light retention */}
         <DailyQuestCompact />
+
+        <CodexPanel />
+        <MemorialPanel />
 
         {/* Advanced: design hangar, economy, passport */}
         <section
@@ -450,15 +455,19 @@ function CraftRow({
 }
 
 function StatusBadge({ status }: { status: Craft["status"] }) {
-  const map = {
+  const map: Record<Craft["status"], string> = {
     design: "bg-slate-500/20 text-slate-300",
     inflight: "bg-emerald-500/20 text-emerald-300",
     complete: "bg-violet-500/20 text-violet-300",
+    lost: "bg-rose-500/20 text-rose-300",
+    retired: "bg-amber-500/15 text-amber-200",
   };
-  const label = {
+  const label: Record<Craft["status"], string> = {
     design: "In design",
     inflight: "In flight",
-    complete: "Complete",
+    complete: "Home",
+    lost: "Silent",
+    retired: "Retired",
   };
   return (
     <span

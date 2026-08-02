@@ -7,7 +7,7 @@ export interface ProbePing {
   id: string;
   atMs: number;
   text: string;
-  kind: "chat" | "milestone" | "return";
+  kind: "chat" | "milestone" | "return" | "last";
 }
 
 /** Shown when a probe comes home — the real game moment */
@@ -21,6 +21,30 @@ export interface VoyageDebrief {
   lootIds: LootId[];
   scarIds: ScarId[];
   personalityId: PersonalityId;
+  /** Optional analysis result text */
+  analysisNote?: string;
+  relationshipLabel?: string;
+}
+
+/** Final transmission before silence */
+export interface LastMessage {
+  craftId: string;
+  craftName: string;
+  text: string;
+  atMs: number;
+  missionName?: string;
+}
+
+export interface MemorialEntry {
+  craftId: string;
+  name: string;
+  personalityId?: PersonalityId;
+  scarIds: ScarId[];
+  plaque: string;
+  retiredAt: number;
+  voyagesCompleted: number;
+  lastMessage?: string;
+  lineageNote?: string;
 }
 
 export interface Craft {
@@ -29,8 +53,10 @@ export interface Craft {
   partIds: string[];
   createdAt: number;
   updatedAt: number;
-  /** Set once launched */
-  status: "design" | "inflight" | "complete";
+  /**
+   * design | inflight | complete (home) | lost (silent) | retired (memorial)
+   */
+  status: "design" | "inflight" | "complete" | "lost" | "retired";
   missionId?: MissionProfileId;
   orbit?: OrbitElements;
   launchedAt?: number;
@@ -61,6 +87,20 @@ export interface Craft {
   lastDebrief?: VoyageDebrief;
   /** Preset flavor id if launched from one-tap */
   presetId?: string;
+
+  /** -50 clingy/babied … +50 hardened/cynical from trip history */
+  relationship?: number;
+  voyagesCompleted?: number;
+  hardTrips?: number;
+  softTrips?: number;
+  /** Deliberately under-equipped chaos launch */
+  absurdLaunch?: boolean;
+  /** Parent probe id for lineage flavor */
+  lineageParentId?: string;
+  lineageNote?: string;
+  lastMessage?: string;
+  retiredAt?: number;
+  memorialPlaque?: string;
 }
 
 export interface FleetState {

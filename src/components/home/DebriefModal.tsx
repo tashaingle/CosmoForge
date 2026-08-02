@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { shareDebriefCard } from "@/lib/share-debrief";
 import { getPreset } from "@/lib/quick-launch";
 import { presetIdsUnlockedByLoot } from "@/lib/probe-unlocks";
+import { ANALYSIS_COST, analyzeLoot } from "@/lib/probe-analysis";
 
 interface Props {
   debrief: VoyageDebrief;
@@ -23,6 +24,10 @@ export function DebriefModal({ debrief, onClose }: Props) {
   const [unlockedLabels, setUnlockedLabels] = useState<string[]>([]);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [analysisNote, setAnalysisNote] = useState<string | null>(
+    debrief.analysisNote ?? null
+  );
+  const [analysisErr, setAnalysisErr] = useState<string | null>(null);
   const personality = getPersonality(debrief.personalityId);
 
   useEffect(() => {
@@ -83,6 +88,9 @@ export function DebriefModal({ debrief, onClose }: Props) {
         </h2>
         <p className="mt-1 text-sm text-slate-400">
           {debrief.missionName} · {personality.label}
+          {debrief.relationshipLabel
+            ? ` · ${debrief.relationshipLabel}`
+            : ""}
         </p>
 
         <blockquote className="mt-4 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-relaxed text-cyan-50">
@@ -175,6 +183,37 @@ export function DebriefModal({ debrief, onClose }: Props) {
               ))}
             </ul>
           </div>
+        )}
+
+        {analysisNote && (
+          <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-950/30 px-4 py-3 text-sm text-amber-50">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+              Analysis
+            </p>
+            <p className="mt-1">{analysisNote}</p>
+          </div>
+        )}
+
+        {!analysisNote && (
+          <button
+            type="button"
+            onClick={() => {
+              setAnalysisErr(null);
+              const res = analyzeLoot(debrief.lootIds, debrief.craftId);
+              if (!res.ok) {
+                setAnalysisErr(res.error ?? "Analysis failed");
+                return;
+              }
+              setAnalysisNote(res.note ?? "Done.");
+              refreshWallet();
+            }}
+            className="mt-4 w-full rounded-xl border border-amber-400/30 bg-amber-500/10 py-2.5 text-sm font-medium text-amber-100 hover:bg-amber-500/20"
+          >
+            Examine cargo (✦ {ANALYSIS_COST}) — maybe a mystery
+          </button>
+        )}
+        {analysisErr && (
+          <p className="mt-2 text-xs text-rose-300">{analysisErr}</p>
         )}
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">

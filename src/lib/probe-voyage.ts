@@ -21,6 +21,13 @@ import {
   upsertCraft,
   type SyncContext,
 } from "./storage";
+import {
+  applyTripToRelationship,
+  bondLabel,
+  isHardMission,
+  relationshipPingFlavor,
+} from "./probe-relationship";
+import { addLastMessage, pickLastLine } from "./probe-memorial";
 
 /** Real-time mission length until “ready to come home” (play-tuned) */
 export function voyageDurationMs(missionId?: MissionProfileId): number {
@@ -126,10 +133,16 @@ export function advanceVoyageStory(
 
     const seed = hashSeed(craft.id + id);
     const ev = pickWeighted(seed + i * 17);
-    const line = fillPing(
+    let line = fillPing(
       pickLine(personality.pingTemplates, seed),
       ev.tag
     );
+    // Scars tint the voice permanently
+    if (scars.has("quiet_now")) line = line.replace(/!+/g, ".");
+    if (scars.has("overshares")) line += " Also I logged twelve other things.";
+    if (scars.has("limps")) line += " (thruster still theatrical.)";
+    const rel = relationshipPingFlavor(craft.relationship);
+    if (rel && i === 0) line = `${line} ${rel}`;
     const ping: ProbePing = {
       id,
       atMs: beatAt,
@@ -140,6 +153,52 @@ export function advanceVoyageStory(
     newPings.push(ping);
     if (ev.loot) loot.add(ev.loot);
     if (ev.scar) scars.add(ev.scar);
+  }
+
+  // Absurd launches: chance to go silent near end (last message + lost)
+  const absurdFailAt = launched + dur * 0.85;
+  if (
+    craft.absurdLaunch &&
+    now >= absurdFailAt &&
+    !pings.some((p) => p.id === "last") &&
+    hashSeed(craft.id + "lose") % 100 < 42
+  ) {
+    const seed = hashSeed(craft.id + "last");
+    const text = pickLastLine(seed);
+    const lastPing: ProbePing = {
+      id: "last",
+      atMs: absurdFailAt,
+      text,
+      kind: "last",
+    };
+    pings.push(lastPing);
+    newPings.push(lastPing);
+    addLastMessage({
+      craftId: craft.id,
+      craftName: craft.name,
+      text,
+      atMs: absurdFailAt,
+      missionName: MISSION_PROFILES.find((m) => m.id === craft.missionId)?.name,
+    });
+    const lostCraft: Craft = {
+      ...craft,
+      personalityId,
+      pings: pings.sort((a, b) => a.atMs - b.atMs),
+      cargoLootIds: [...loot],
+      scarIds: [...scars],
+      status: "lost",
+      lastMessage: text,
+      readyToReturn: false,
+      updatedAt: now,
+    };
+    return {
+      craft: applyTripToRelationship(lostCraft, {
+        hard: true,
+        absurd: true,
+        lost: true,
+      }),
+      newPings,
+    };
   }
 
   // Arrival ping
@@ -156,8 +215,8 @@ export function advanceVoyageStory(
     pings.push(ping);
     newPings.push(ping);
     readyToReturn = true;
-    // Guarantee at least one loot
     if (loot.size === 0) loot.add("noise_sample");
+    if (craft.absurdLaunch) loot.add("lucky_bolt");
   } else if (ready) {
     readyToReturn = true;
   }
@@ -181,6 +240,7 @@ export function buildDebrief(craft: Craft): VoyageDebrief {
   const mission = MISSION_PROFILES.find((m) => m.id === craft.missionId);
   const lootIds = craft.cargoLootIds ?? [];
   const scarIds = craft.scarIds ?? [];
+  const rel = bondLabel(craft.relationship);
 
   const highlights = [
     ...lootIds.slice(0, 3).map((id) => {
@@ -192,6 +252,9 @@ export function buildDebrief(craft: Craft): VoyageDebrief {
       return `Changed: ${s.label}. ${s.blurb}`;
     }),
   ];
+  if (craft.lineageNote) {
+    highlights.unshift(`Lineage: ${craft.lineageNote}`);
+  }
   if (highlights.length === 0) {
     highlights.push("Brought back: residual stubbornness. Not catalogued.");
   }
@@ -201,11 +264,12 @@ export function buildDebrief(craft: Craft): VoyageDebrief {
     craftName: craft.name,
     missionName: mission?.name ?? "Odd job",
     opener: pickLine(personality.debriefOpeners, seed),
-    summary: `${craft.name} (${personality.label}) finished ${mission?.name ?? "a trip"}. Travel was mostly automatic. The interesting part is what came back.`,
+    summary: `${craft.name} (${personality.label}, ${rel}) finished ${mission?.name ?? "a trip"}. Travel was mostly automatic. The interesting part is what came back.`,
     highlights,
     lootIds,
     scarIds,
     personalityId: personality.id,
+    relationshipLabel: rel,
   };
 }
 
@@ -216,13 +280,19 @@ export function returnProbe(
 ): { ok: boolean; craft?: Craft; debrief?: VoyageDebrief; error?: string } {
   let craft = getCraft(craftId);
   if (!craft) return { ok: false, error: "Probe not found" };
+  if (craft.status === "lost") {
+    return { ok: false, error: "They’re silent. You have their last message." };
+  }
   if (craft.status !== "inflight") {
     return { ok: false, error: "Not out on a voyage" };
   }
 
-  // Ensure story is fully generated
   const advanced = advanceVoyageStory(craft);
   craft = advanced.craft;
+  if (craft.status === "lost") {
+    upsertCraft(craft, sync);
+    return { ok: false, error: "Last message received. They’re gone." };
+  }
 
   if (!isReadyToReturn(craft)) {
     const left = (craft.expectedReturnAt ?? Date.now()) - Date.now();
@@ -232,6 +302,11 @@ export function returnProbe(
       error: `Still out there (~${mins}m). They’ll ping when ready.`,
     };
   }
+
+  craft = applyTripToRelationship(craft, {
+    hard: isHardMission(craft.missionId) || !!craft.absurdLaunch,
+    absurd: craft.absurdLaunch,
+  });
 
   const debrief = buildDebrief(craft);
   const next: Craft = {
@@ -250,26 +325,33 @@ export function tickAllVoyages(sync?: SyncContext): {
   updated: Craft[];
   freshPings: { craftId: string; name: string; text: string }[];
   readyIds: string[];
+  lostIds: string[];
 } {
   const fleet = loadFleet();
   const freshPings: { craftId: string; name: string; text: string }[] = [];
   const readyIds: string[] = [];
+  const lostIds: string[] = [];
   const updated: Craft[] = [];
 
   for (const c of fleet.crafts) {
     if (c.status !== "inflight") continue;
     const { craft, newPings } = advanceVoyageStory(c);
-    if (newPings.length || craft.readyToReturn !== c.readyToReturn) {
+    const changed =
+      newPings.length ||
+      craft.readyToReturn !== c.readyToReturn ||
+      craft.status !== c.status;
+    if (changed) {
       upsertCraft(craft, sync);
       updated.push(craft);
     }
     for (const p of newPings) {
       freshPings.push({ craftId: craft.id, name: craft.name, text: p.text });
     }
-    if (isReadyToReturn(craft)) readyIds.push(craft.id);
+    if (craft.status === "lost") lostIds.push(craft.id);
+    else if (isReadyToReturn(craft)) readyIds.push(craft.id);
   }
 
-  return { updated, freshPings, readyIds };
+  return { updated, freshPings, readyIds, lostIds };
 }
 
 /** Dev/test: force a probe ready to return soon (or now) */

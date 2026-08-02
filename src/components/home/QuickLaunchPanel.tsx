@@ -76,6 +76,7 @@ export function QuickLaunchPanel({
   const [busy, setBusy] = useState<PresetId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [absurd, setAbsurd] = useState(false);
 
   const collection = useMemo(() => {
     void tick;
@@ -97,7 +98,7 @@ export function QuickLaunchPanel({
     }
     setBusy(id);
     try {
-      const res = quickLaunch(id, syncContext);
+      const res = quickLaunch(id, syncContext, { absurd });
       if (!res.ok || !res.craft) {
         setError(res.error ?? "Launch failed");
         setBusy(null);
@@ -174,7 +175,22 @@ export function QuickLaunchPanel({
               back finds to open more
             </p>
           </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+            <input
+              type="checkbox"
+              checked={absurd}
+              onChange={(e) => setAbsurd(e.target.checked)}
+              className="rounded border-rose-400/40"
+            />
+            Deliberately bad launch
+          </label>
         </div>
+        {absurd && (
+          <p className="text-xs text-rose-300/90">
+            Under-equipped chaos mode. High chance of last messages. High chance
+            of comedy. Occasionally cursed loot.
+          </p>
+        )}
 
         <PresetGrid
           presets={free}
