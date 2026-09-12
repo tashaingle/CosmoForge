@@ -1,5 +1,5 @@
-import { HangarClient } from "@/components/hangar/HangarClient";
+import { ControlClient } from "@/components/control/ControlClient";
 
 export default function HomePage() {
-  return <HangarClient />;
+  return <ControlClient />;
 }

@@ -8,6 +8,9 @@ export interface ProbePing {
   atMs: number;
   text: string;
   kind: "chat" | "milestone" | "return" | "last";
+  /** Optional lightweight player response; old saves simply omit these. */
+  resolvedChoiceId?: string;
+  resolutionText?: string;
 }
 
 /** Shown when a probe comes home — the real game moment */
