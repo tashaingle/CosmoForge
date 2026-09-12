@@ -64,6 +64,22 @@ At present cloud craft rows only include core design/flight information. Persona
 
 `src/components/control/DevPanel.tsx` only renders when `process.env.NODE_ENV === "development"`. Start with `npm run dev`, open Control, then expand `DEV // CHEAT CONSOLE`. It can advance/complete a mission, create transmissions and encounters, add scars/finds/credits, or reset CosmoForge local keys. Resetting local save does not delete cloud rows. The panel produces no UI in a production build.
 
+Use **Replay onboarding** to run the first-probe sequence without deleting the real fleet. The replay probe is deliberately local-only and is removed when the replay finishes. A truly clean test is still performed with an empty `cosmoforge-fleet-v1` and no `cosmoforge-onboarding-v1` flag.
+
+## First-player onboarding
+
+`src/components/onboarding/CosmoForgeEntry.tsx` waits for auth/cloud merging, then calls `shouldShowOnboarding()` from `src/lib/onboarding.ts`. Onboarding appears only when the fleet is empty, unless an `in_progress` onboarding save or development replay exists. Completion is stored under `cosmoforge-onboarding-v1`.
+
+The screens and 75-second first mission live in `src/components/onboarding/FirstProbeOnboarding.tsx`; the three personality options live in `PersonalityChoice.tsx`. The short duration is selected by `craftVoyageDurationMs()` in `src/lib/probe-voyage.ts` only when `Craft.onboardingMission` is true. Normal mission durations are unchanged.
+
+## Encounters and probe memory
+
+Encounter definitions are in `src/game/encounters.ts`. An encounter has an ID, title, trigger progress, personality-specific message, and choices. Each choice declares relationship changes, optional existing loot/scar IDs, personality responses, and memory values. `src/game/transmissions.ts` connects encounter pings to the existing Transmissions panel and persists the result.
+
+To add an encounter, add one `EncounterDefinition` to `ENCOUNTERS`, then arrange for `probe-voyage.ts` to create a `ProbePing` containing its `encounterId` at the desired trigger. Do not hard-code its buttons in a component.
+
+Memory is the optional `memory` object on `Craft` in `src/lib/types.ts`. Values are only strings, numbers or booleans. Helpers live in `src/game/probe-memory.ts`. Add a memory consequence to an encounter choice, then add a readable reference in `memoryFlavour()` for later transmissions or `firstEncounterMemoryLine()` for debrief. Keep keys descriptive and stable, such as `first_encounter_choice` or `strange_photos`.
+
 ## Before committing an edit
 
 Run `npm run lint`, `npm exec tsc -- --noEmit`, and `npm run build`. The project’s original baseline contains React 19 lint debt, documented in `COSMOFORGE_NOTES.md`; new or edited files should still be kept clean.

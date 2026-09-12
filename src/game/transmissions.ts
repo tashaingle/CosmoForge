@@ -1,51 +1,30 @@
 import type { Craft, ProbePing } from "@/lib/types";
 import { upsertCraft, type SyncContext } from "@/lib/storage";
+import {
+  applyEncounterChoice,
+  getEncounter,
+  type EncounterChoice,
+  type EncounterChoiceId,
+} from "./encounters";
 
-export type TransmissionChoice = {
-  id: "investigate" | "leave" | "photo";
-  label: string;
-  consequence: string;
-};
-
-export type InteractiveTransmission = ProbePing & { choices?: TransmissionChoice[] };
-
-const CHOICES: TransmissionChoice[] = [
-  { id: "investigate", label: "Investigate", consequence: "Risk accepted. The antenna is making brave noises." },
-  { id: "leave", label: "Absolutely not", consequence: "Prudence logged. The void seems offended." },
-  { id: "photo", label: "Take a photo", consequence: "Image stored. It is mostly blur and emotional significance." },
-];
+export type InteractiveTransmission = ProbePing & { choices?: EncounterChoice[] };
 
 export function transmissionFor(ping: ProbePing): InteractiveTransmission {
-  return ping.kind === "milestone" && !ping.resolvedChoiceId
-    ? { ...ping, choices: CHOICES }
+  const encounter = ping.encounterId ? getEncounter(ping.encounterId) : undefined;
+  return encounter && !ping.resolvedChoiceId
+    ? { ...ping, choices: encounter.choices }
     : ping;
 }
 
 export function resolveTransmissionChoice(
   craft: Craft,
   pingId: string,
-  choice: TransmissionChoice,
+  choiceId: EncounterChoiceId,
   sync?: SyncContext
-): Craft {
-  const pings = (craft.pings ?? []).map((ping) =>
-    ping.id === pingId
-      ? { ...ping, resolvedChoiceId: choice.id, resolutionText: choice.consequence }
-      : ping
-  );
-  const cargo = new Set(craft.cargoLootIds ?? []);
-  const scars = new Set(craft.scarIds ?? []);
-  let relationship = craft.relationship ?? 0;
-  if (choice.id === "investigate") {
-    cargo.add("suspicious_reading");
-    relationship += 2;
-  } else if (choice.id === "photo") {
-    cargo.add("pretty_earthrise");
-    relationship -= 1;
-  } else {
-    scars.add("afraid_of_dark");
-    relationship -= 2;
-  }
-  const next = { ...craft, pings, cargoLootIds: [...cargo], scarIds: [...scars], relationship };
-  upsertCraft(next, sync);
+): Craft | null {
+  const ping = craft.pings?.find((item) => item.id === pingId);
+  if (!ping?.encounterId) return null;
+  const next = applyEncounterChoice(craft, pingId, ping.encounterId, choiceId);
+  if (next) upsertCraft(next, sync);
   return next;
 }

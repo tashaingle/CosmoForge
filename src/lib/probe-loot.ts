@@ -19,7 +19,8 @@ export type LootId =
   | "friend_shaped_void"
   | "lucky_bolt"
   | "storm_souvenir"
-  | "first_light";
+  | "first_light"
+  | "friend_shaped_photo";
 
 export interface LootDef {
   id: LootId;
@@ -135,6 +136,13 @@ export const LOOT_CATALOG: LootDef[] = [
     blurb: "The first useful photo. Frame it. Or don’t. (Frame it.)",
     rarity: "uncommon",
     creditValue: 80,
+  },
+  {
+    id: "friend_shaped_photo",
+    name: "Friend-shaped void photograph",
+    blurb: "The empty part of the image appears to be posing.",
+    rarity: "rare",
+    creditValue: 95,
   },
 ];
 

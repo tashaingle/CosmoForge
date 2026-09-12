@@ -158,3 +158,11 @@ Keep `Craft` as the central probe record and keep the deterministic voyage funct
 ## Redesign implemented
 
 The root route now renders `ControlClient`, which owns one fleet snapshot and passes it to a compact fleet rail, central mission stage, and transmission panel. Probe characters use the layered SVG `ProbeVisual`; existing skin, scar, voyage, cargo, and ID data determine the visible result. Milestone pings can expose one small set of choices stored back on the original ping. Launching uses the existing quick-launch logic followed by a short presentation overlay. Debrief is a four-stage reveal. `/hangar` preserves the full existing management UI and `/archive` hosts Passport, Codex, and memorial records. Development builds include a clearly labelled cheat console; production renders nothing for it.
+
+## First-player onboarding
+
+`src/components/onboarding/CosmoForgeEntry.tsx` decides between onboarding and normal Control after authentication/cloud merging is ready. `src/lib/onboarding.ts` stores `cosmoforge-onboarding-v1`. No flag plus an empty fleet means a genuinely new player; an existing fleet skips onboarding. An `in_progress` record with a craft ID lets an interrupted first mission resume. The flag becomes `complete` only after the first debrief.
+
+`FirstProbeOnboarding.tsx` owns only the focused first-session sequence. The preview probe becomes a real persisted `Craft` through the existing quick-launch/storage path. `onboardingMission` gives that craft a 75-second voyage without changing any normal duration. Its guaranteed encounter is `first_matching_signal` in `src/game/encounters.ts`. Return stays locked until its choice is resolved.
+
+Probe memories are plain values on `Craft.memory`, with helpers and later dialogue references in `src/game/probe-memory.ts`. Encounter resolution updates the original ping, existing relationship number, cargo/scars, and memory in one craft save. The debrief reads the same craft to reveal the decision. Development Control has a “Replay onboarding” action; its temporary probe is kept local and removed after replay, leaving the real fleet/cloud untouched.

@@ -13,12 +13,14 @@ import { DebriefModal } from "@/components/home/DebriefModal";
 import { loadFleet, replaceFleet, upsertCraft } from "@/lib/storage";
 import { tickAllVoyages, returnProbe, voyageDurationMs } from "@/lib/probe-voyage";
 import { quickLaunch, LAUNCH_PRESETS } from "@/lib/quick-launch";
-import { resolveTransmissionChoice, type TransmissionChoice } from "@/game/transmissions";
+import { resolveTransmissionChoice } from "@/game/transmissions";
+import type { EncounterChoiceId } from "@/game/encounters";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { loadWallet } from "@/lib/economy";
 import type { Craft, FleetState, ProbePing, VoyageDebrief } from "@/lib/types";
+import { beginDevelopmentReplay } from "@/lib/onboarding";
 
-const SAVE_KEYS = ["cosmoforge-fleet-v1", "cosmoforge-wallet-v1", "cosmoforge-collection-v1", "cosmoforge-daily-v1", "cosmoforge-objectives-v1", "cosmoforge-passport-v1", "cosmoforge-memorials-v1", "cosmoforge-last-messages-v1", "cosmoforge-last-home-ms"];
+const SAVE_KEYS = ["cosmoforge-fleet-v1", "cosmoforge-wallet-v1", "cosmoforge-collection-v1", "cosmoforge-daily-v1", "cosmoforge-objectives-v1", "cosmoforge-passport-v1", "cosmoforge-memorials-v1", "cosmoforge-last-messages-v1", "cosmoforge-last-home-ms", "cosmoforge-onboarding-v1"];
 
 export function ControlClient() {
   const { ready, syncContext, wallet, refreshWallet, cloudSynced, cloudSyncing } = useAuth();
@@ -56,9 +58,9 @@ export function ControlClient() {
     refresh();
   }
 
-  function choose(pingId: string, choice: TransmissionChoice) {
+  function choose(pingId: string, choiceId: EncounterChoiceId) {
     if (!selected) return;
-    resolveTransmissionChoice(selected, pingId, choice, syncContext);
+    resolveTransmissionChoice(selected, pingId, choiceId, syncContext);
     refresh();
   }
 
@@ -81,12 +83,13 @@ export function ControlClient() {
   }
 
   function devAction(action: DevAction) {
+    if (action === "onboarding") { beginDevelopmentReplay(); window.location.reload(); return; }
     if (action === "reset") { if (window.confirm("Erase every local CosmoForge save? Cloud data is untouched.")) { SAVE_KEYS.forEach((key) => localStorage.removeItem(key)); window.location.reload(); } return; }
     if (action === "credits") { const next = loadWallet(); next.credits += 500; next.updatedAt = Date.now(); localStorage.setItem("cosmoforge-wallet-v1", JSON.stringify(next)); refreshWallet(); return; }
     if (!selected) return;
     const craft = { ...selected };
     if (action === "advance" || action === "complete") { const duration = voyageDurationMs(craft.missionId); craft.launchedAt = Date.now() - duration * (action === "complete" ? 1.1 : Math.min(.95, ((Date.now() - (craft.launchedAt ?? Date.now())) / duration) + .1)); if (action === "complete") craft.readyToReturn = true; }
-    if (action === "transmission" || action === "weird") { const ping: ProbePing = { id: `dev-${Date.now()}`, atMs: Date.now(), kind: action === "weird" ? "milestone" : "chat", text: action === "weird" ? "We found something. It is shaped like a bad decision." : "Development ping. Reality appears optional." }; craft.pings = [...(craft.pings ?? []), ping]; }
+    if (action === "transmission" || action === "weird") { const ping: ProbePing = { id: `dev-${Date.now()}`, atMs: Date.now(), kind: action === "weird" ? "milestone" : "chat", encounterId: action === "weird" ? "first_matching_signal" : undefined, text: action === "weird" ? "We found something. It is shaped like a bad decision." : "Development ping. Reality appears optional." }; craft.pings = [...(craft.pings ?? []), ping]; }
     if (action === "scar") craft.scarIds = [...new Set([...(craft.scarIds ?? []), "scorched" as const])];
     if (action === "rare") craft.cargoLootIds = [...new Set([...(craft.cargoLootIds ?? []), "unscheduled_emotion" as const])];
     if (action === "cursed") craft.cargoLootIds = [...new Set([...(craft.cargoLootIds ?? []), "friend_shaped_void" as const])];

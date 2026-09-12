@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Craft } from "@/lib/types";
 import { MISSION_PROFILES } from "@/lib/orbital";
 import { getPersonality, getScar } from "@/lib/probe-personality";
-import { bondLabel } from "@/lib/probe-relationship";
+import { affectionateBondLabel } from "@/lib/probe-relationship";
 import { voyageProgress, isReadyToReturn } from "@/lib/probe-voyage";
 import { ProbeVisual } from "@/components/probe/ProbeVisual";
 
@@ -19,7 +19,7 @@ export function MissionStage({ craft, now, onReturn }: { craft: Craft | null; no
       <div className="mission-orbit" aria-hidden><i /><i /><i /></div>
       <div className="relative z-10 flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
-          <div><p className="control-kicker">Selected carrier · {destination}</p><h1 className="mt-1 text-3xl font-black tracking-tight text-white sm:text-5xl">{craft.name}</h1><p className="mt-1 text-sm uppercase tracking-[.2em] text-slate-300">{personality.label} · Bond: {bondLabel(craft.relationship)}</p></div>
+          <div><p className="control-kicker">Selected carrier · {destination}</p><h1 className="mt-1 text-3xl font-black tracking-tight text-white sm:text-5xl">{craft.name}</h1><p className="mt-1 text-sm uppercase tracking-[.2em] text-slate-300">{personality.label} · Bond: {affectionateBondLabel(craft)}</p></div>
           <span className="id-plate">CF-{craft.id.slice(0, 5).toUpperCase()}</span>
         </div>
         <div className="min-h-0 flex-1"><ProbeVisual craft={craft} /></div>

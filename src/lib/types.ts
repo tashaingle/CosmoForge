@@ -11,7 +11,12 @@ export interface ProbePing {
   /** Optional lightweight player response; old saves simply omit these. */
   resolvedChoiceId?: string;
   resolutionText?: string;
+  /** Links the message to a small data-driven encounter definition. */
+  encounterId?: string;
 }
+
+/** Small, durable facts a probe can refer to later. */
+export type ProbeMemory = Record<string, string | number | boolean>;
 
 /** Shown when a probe comes home — the real game moment */
 export interface VoyageDebrief {
@@ -27,6 +32,8 @@ export interface VoyageDebrief {
   /** Optional analysis result text */
   analysisNote?: string;
   relationshipLabel?: string;
+  memoryLine?: string;
+  bondChange?: number;
 }
 
 /** Final transmission before silence */
@@ -104,6 +111,10 @@ export interface Craft {
   lastMessage?: string;
   retiredAt?: number;
   memorialPlaque?: string;
+  /** Lightweight story facts; see src/game/probe-memory.ts. */
+  memory?: ProbeMemory;
+  /** Marks the one short first-session mission without changing normal missions. */
+  onboardingMission?: boolean;
 }
 
 export interface FleetState {

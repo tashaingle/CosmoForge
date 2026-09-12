@@ -98,3 +98,14 @@ export function relationshipPingFlavor(relationship = 0): string | null {
   if (label === "Done with you") return "…";
   return null;
 }
+
+export function affectionateBondLabel(craft: Craft): string {
+  const relationship = craft.relationship ?? 0;
+  const stage = relationship <= 2 ? "Professional distance" : relationship <= 6 ? "Tolerating you" : relationship <= 12 ? "Fond of you" : "Disturbingly loyal";
+  const personality = craft.personalityId ?? "chipper";
+  if (stage === "Professional distance" && personality === "anxious") return "Politely attached";
+  if (stage === "Tolerating you" && personality === "dramatic") return "Recognises your importance";
+  if (stage === "Fond of you" && personality === "chaotic") return "Would press buttons for you";
+  if (stage === "Disturbingly loyal" && personality === "anxious") return "Worries specifically about you";
+  return stage;
+}

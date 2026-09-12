@@ -23,11 +23,14 @@ import {
 } from "./storage";
 import {
   applyTripToRelationship,
+  affectionateBondLabel,
   bondLabel,
   isHardMission,
   relationshipPingFlavor,
 } from "./probe-relationship";
 import { addLastMessage, pickLastLine } from "./probe-memorial";
+import { encounterMessage, getEncounter } from "@/game/encounters";
+import { firstEncounterMemoryLine, incrementMemory, memoryFlavour } from "@/game/probe-memory";
 
 /** Real-time mission length until “ready to come home” (play-tuned) */
 export function voyageDurationMs(missionId?: MissionProfileId): number {
@@ -48,10 +51,16 @@ export function voyageDurationMs(missionId?: MissionProfileId): number {
   }
 }
 
+export function craftVoyageDurationMs(craft: Craft): number {
+  return craft.onboardingMission ? 75 * 1000 : voyageDurationMs(craft.missionId);
+}
+
 export function voyageProgress(craft: Craft, now = Date.now()): number {
   if (craft.status !== "inflight" || !craft.launchedAt) return 0;
-  const dur = voyageDurationMs(craft.missionId);
-  return Math.min(1, (now - craft.launchedAt) / dur);
+  const dur = craftVoyageDurationMs(craft);
+  const progress = Math.min(1, (now - craft.launchedAt) / dur);
+  const waitingForChoice = craft.onboardingMission && craft.pings?.some((ping) => ping.encounterId && !ping.resolvedChoiceId);
+  return waitingForChoice ? Math.min(0.86, progress) : progress;
 }
 
 export function isReadyToReturn(craft: Craft, now = Date.now()): boolean {
@@ -101,6 +110,37 @@ function pickWeighted(
   return EVENT_SNIPPETS[0];
 }
 
+function advanceOnboardingVoyage(craft: Craft, now: number): { craft: Craft; newPings: ProbePing[] } {
+  const launched = craft.launchedAt ?? now;
+  const duration = craftVoyageDurationMs(craft);
+  const encounter = getEncounter("first_matching_signal");
+  const pings = [...(craft.pings ?? [])];
+  const newPings: ProbePing[] = [];
+  if (encounter && now >= launched + duration * encounter.triggerProgress && !pings.some((ping) => ping.encounterId === encounter.id)) {
+    const ping: ProbePing = {
+      id: `encounter-${encounter.id}`,
+      encounterId: encounter.id,
+      atMs: launched + duration * encounter.triggerProgress,
+      kind: "milestone",
+      text: encounterMessage(encounter, craft.personalityId ?? "chipper"),
+    };
+    pings.push(ping);
+    newPings.push(ping);
+  }
+  const encounterResolved = pings.some((ping) => ping.encounterId === encounter?.id && ping.resolvedChoiceId);
+  let readyToReturn = craft.readyToReturn ?? false;
+  if (encounterResolved && now >= launched + duration && !pings.some((ping) => ping.id === "ready")) {
+    const flavour = memoryFlavour(craft);
+    const ping: ProbePing = { id: "ready", atMs: launched + duration, kind: "return", text: flavour ? `Test flight complete. ${flavour}` : "Test flight complete. I have several notes and one new noise." };
+    pings.push(ping);
+    newPings.push(ping);
+    readyToReturn = true;
+  } else if (encounterResolved && now >= launched + duration) {
+    readyToReturn = true;
+  }
+  return { craft: { ...craft, pings: pings.sort((a, b) => a.atMs - b.atMs), expectedReturnAt: launched + duration, readyToReturn }, newPings };
+}
+
 /**
  * Advance voyage story while offline / on home open.
  * Generates pings and marks readyToReturn.
@@ -112,6 +152,7 @@ export function advanceVoyageStory(
   if (craft.status !== "inflight" || !craft.launchedAt) {
     return { craft, newPings: [] };
   }
+  if (craft.onboardingMission) return advanceOnboardingVoyage(craft, now);
 
   const personalityId: PersonalityId =
     craft.personalityId ?? "chipper";
@@ -143,6 +184,8 @@ export function advanceVoyageStory(
     if (scars.has("limps")) line += " (thruster still theatrical.)";
     const rel = relationshipPingFlavor(craft.relationship);
     if (rel && i === 0) line = `${line} ${rel}`;
+    const remembered = memoryFlavour(craft);
+    if (remembered && i === 0) line = `${line} ${remembered}`;
     const ping: ProbePing = {
       id,
       atMs: beatAt,
@@ -240,7 +283,8 @@ export function buildDebrief(craft: Craft): VoyageDebrief {
   const mission = MISSION_PROFILES.find((m) => m.id === craft.missionId);
   const lootIds = craft.cargoLootIds ?? [];
   const scarIds = craft.scarIds ?? [];
-  const rel = bondLabel(craft.relationship);
+  const rel = craft.onboardingMission ? affectionateBondLabel(craft) : bondLabel(craft.relationship);
+  const memoryLine = firstEncounterMemoryLine(craft);
 
   const highlights = [
     ...lootIds.slice(0, 3).map((id) => {
@@ -262,7 +306,7 @@ export function buildDebrief(craft: Craft): VoyageDebrief {
   return {
     craftId: craft.id,
     craftName: craft.name,
-    missionName: mission?.name ?? "Odd job",
+    missionName: craft.onboardingMission ? "Definitely Safe Test Flight" : mission?.name ?? "Odd job",
     opener: pickLine(personality.debriefOpeners, seed),
     summary: `${craft.name} (${personality.label}, ${rel}) finished ${mission?.name ?? "a trip"}. Travel was mostly automatic. The interesting part is what came back.`,
     highlights,
@@ -270,6 +314,8 @@ export function buildDebrief(craft: Craft): VoyageDebrief {
     scarIds,
     personalityId: personality.id,
     relationshipLabel: rel,
+    memoryLine,
+    bondChange: craft.onboardingMission ? craft.relationship ?? 0 : undefined,
   };
 }
 
@@ -303,10 +349,18 @@ export function returnProbe(
     };
   }
 
-  craft = applyTripToRelationship(craft, {
-    hard: isHardMission(craft.missionId) || !!craft.absurdLaunch,
-    absurd: craft.absurdLaunch,
-  });
+  if (craft.onboardingMission) {
+    craft = {
+      ...craft,
+      voyagesCompleted: (craft.voyagesCompleted ?? 0) + 1,
+      memory: incrementMemory(craft.memory, "missions_survived"),
+    };
+  } else {
+    craft = applyTripToRelationship(craft, {
+      hard: isHardMission(craft.missionId) || !!craft.absurdLaunch,
+      absurd: craft.absurdLaunch,
+    });
+  }
 
   const debrief = buildDebrief(craft);
   const next: Craft = {
@@ -365,7 +419,7 @@ export function forceReadySoon(craftId: string, sync?: SyncContext): Craft | nul
   };
   const { craft: story } = advanceVoyageStory({
     ...next,
-    launchedAt: (next.launchedAt ?? Date.now()) - voyageDurationMs(next.missionId),
+    launchedAt: (next.launchedAt ?? Date.now()) - craftVoyageDurationMs(next),
   });
   upsertCraft(story, sync);
   return story;

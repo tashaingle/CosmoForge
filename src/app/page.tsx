@@ -1,5 +1,5 @@
-import { ControlClient } from "@/components/control/ControlClient";
+import { CosmoForgeEntry } from "@/components/onboarding/CosmoForgeEntry";
 
 export default function HomePage() {
-  return <ControlClient />;
+  return <CosmoForgeEntry />;
 }

@@ -12,8 +12,16 @@ import { shareDebriefCard } from "@/lib/share-debrief";
 import { getPreset } from "@/lib/quick-launch";
 import { presetIdsUnlockedByLoot } from "@/lib/probe-unlocks";
 import { ANALYSIS_COST, analyzeLoot } from "@/lib/probe-analysis";
+import { affectionateBondLabel } from "@/lib/probe-relationship";
 
-export function DebriefModal({ debrief, onClose }: { debrief: VoyageDebrief; onClose: () => void }) {
+type DebriefActions = {
+  primaryLabel: string;
+  onPrimary: () => void;
+  viewLabel: string;
+  onView: () => void;
+};
+
+export function DebriefModal({ debrief, onClose, actions }: { debrief: VoyageDebrief; onClose: () => void; actions?: DebriefActions }) {
   const { persistWallet, refreshWallet } = useAuth();
   const [stage, setStage] = useState(0);
   const [reward, setReward] = useState<{ credits: number; newFinds: string[]; unlocks: string[] } | null>(null);
@@ -58,8 +66,8 @@ export function DebriefModal({ debrief, onClose }: { debrief: VoyageDebrief; onC
       {stage === 0 && <div className="debrief-signal"><div className="debrief-radar" /><p>Carrier wave identified.</p><blockquote>“{debrief.opener}”</blockquote></div>}
       {stage === 1 && <div className="debrief-reveal">{craft && <div className="h-64"><ProbeVisual craft={craft} /></div>}<div><p className="control-kicker">Physical changes</p>{debrief.scarIds.length ? debrief.scarIds.map((id) => { const scar = getScar(id); return <article key={id} className="scar-stamp"><strong>{scar.label}</strong><span>{scar.blurb}</span></article>; }) : <p className="mt-3 text-slate-400">No new scars. Suspiciously tidy.</p>}</div></div>}
       {stage === 2 && <div className="cargo-grid">{debrief.lootIds.length ? debrief.lootIds.map((id, index) => { const loot = getLoot(id); return <article key={id} style={{ animationDelay: `${index * 120}ms` }} className={`cargo-item cargo-${loot.rarity}`}><p>{loot.rarity}</p><h3>{loot.name}</h3><span>{loot.blurb}</span><strong>✦ {loot.creditValue}</strong></article>; }) : <p>The cargo bay contains one embarrassed dust mote.</p>}</div>}
-      {stage >= 3 && <div className="debrief-summary"><blockquote>“{debrief.opener}”</blockquote><p>{debrief.summary}</p><ul>{debrief.highlights.map((item) => <li key={item}>{item}</li>)}</ul>{reward && <div className="reward-strip"><span>Recovered</span><strong>+ ✦ {reward.credits}</strong><span>{reward.newFinds.length ? `${reward.newFinds.length} new archive ${reward.newFinds.length === 1 ? "entry" : "entries"}` : "Cargo already catalogued"}</span></div>}{reward?.unlocks.map((label) => <p key={label} className="unlock-line">UNLOCKED {"//"} {label}</p>)}{analysisNote ? <p className="analysis-slip">ANALYSIS {"//"} {analysisNote}</p> : <button type="button" className="debrief-minor" onClick={analyze}>Examine cargo · ✦ {ANALYSIS_COST}</button>}{analysisErr && <p className="text-sm text-rose-300">{analysisErr}</p>}</div>}
-      <footer>{stage < 3 ? <button type="button" className="control-primary" onClick={() => setStage((value) => value + 1)}>{["Acquire signal", "Inspect the damage", "Open cargo"][stage]}</button> : <><button type="button" className="debrief-minor" onClick={() => void share()}>Share debrief</button><button type="button" className="control-primary" onClick={onClose}>Return to control</button></>}{shareMsg && <p>{shareMsg}</p>}</footer>
+      {stage >= 3 && <div className="debrief-summary"><blockquote>“{debrief.opener}”</blockquote><p>{debrief.summary}</p>{debrief.memoryLine && <div className="memory-card"><span>{debrief.craftName} remembers</span><strong>{debrief.memoryLine}</strong></div>}<ul>{debrief.highlights.map((item) => <li key={item}>{item}</li>)}</ul>{craft && <p className="bond-reveal">{craft.name} · {craft.voyagesCompleted ?? 0} voyage{craft.voyagesCompleted === 1 ? "" : "s"} · Bond: {affectionateBondLabel(craft)}{debrief.bondChange ? ` (+${debrief.bondChange})` : ""}</p>}{reward && <div className="reward-strip"><span>Recovered</span><strong>+ ✦ {reward.credits}</strong><span>{reward.newFinds.length ? `${reward.newFinds.length} new Codex ${reward.newFinds.length === 1 ? "entry" : "entries"}` : "Cargo already catalogued"}</span></div>}{reward?.unlocks.map((label) => <p key={label} className="unlock-line">UNLOCKED {"//"} {label}</p>)}{analysisNote ? <p className="analysis-slip">ANALYSIS {"//"} {analysisNote}</p> : <button type="button" className="debrief-minor" onClick={analyze}>Examine cargo · ✦ {ANALYSIS_COST}</button>}{analysisErr && <p className="text-sm text-rose-300">{analysisErr}</p>}</div>}
+      <footer>{stage < 3 ? <button type="button" className="control-primary" onClick={() => setStage((value) => value + 1)}>{["Acquire signal", "Inspect the damage", "Open cargo"][stage]}</button> : actions ? <><button type="button" className="control-primary" onClick={actions.onPrimary}>{actions.primaryLabel}</button><button type="button" className="debrief-minor" onClick={actions.onView}>{actions.viewLabel}</button><button type="button" className="debrief-minor" onClick={onClose}>Return to control</button></> : <><button type="button" className="debrief-minor" onClick={() => void share()}>Share debrief</button><button type="button" className="control-primary" onClick={onClose}>Return to control</button></>}{shareMsg && <p>{shareMsg}</p>}</footer>
     </div>
   </div>;
 }
