@@ -132,3 +132,19 @@ In development, open `DEV // CHEAT CONSOLE` on Control. It can trigger random co
 ## Before committing an edit
 
 Run `npm run lint`, `npm exec tsc -- --noEmit`, and `npm run build`. The project’s original baseline contains React 19 lint debt, documented in `COSMOFORGE_NOTES.md`; new or edited files should still be kept clean.
+## Editing the 3D layer
+
+Read `3D_ASSETS.md` for the complete map. The short version:
+
+- Put runtime GLBs in `public/models/`, not inside React source folders.
+- Edit paths and scar/mission/loot mappings in `src/lib/3d-assets.ts`.
+- Edit probe movement and visible parts in `src/components/three/ProbeModel.tsx`.
+- Edit mission composition in `MissionCanvas.tsx`; keep mission rules elsewhere.
+- Edit Hangar door/clamp presentation in `HangarCanvas.tsx`.
+- Edit high/low/2D behaviour in `three-quality.ts`.
+- Preserve the `fallback` prop everywhere. Do not remove
+  `src/components/probe/ProbeVisual.tsx` merely because WebGL works locally.
+
+In development, `DEV // CHEAT CONSOLE` can force high, low or 2D rendering.
+Its existing scar, find, launch and mission controls exercise the corresponding
+3D states without changing normal timings.

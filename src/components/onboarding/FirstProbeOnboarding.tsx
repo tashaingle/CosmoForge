@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProbeVisual } from "@/components/probe/ProbeVisual";
+import { HangarScene3D } from "@/components/three/HangarScene3D";
 import { PersonalityChoice } from "./PersonalityChoice";
 import { CinematicLaunch } from "@/components/control/LaunchSequence";
 import { MissionStage } from "@/components/control/MissionStage";
@@ -110,7 +111,8 @@ export function FirstProbeOnboarding({ onComplete }: { onComplete: () => void })
 
   if (craft?.status === "inflight") return <main className="onboarding-mission"><header><p className="control-kicker">Definitely safe test flight</p><p>One probe. One orbit. One warranty violation.</p></header><div className="onboarding-mission-grid"><MissionStage craft={craft} now={now} onReturn={callHome} /><TransmissionsPanel craft={craft} onChoice={choose} /></div>{isReadyToReturn(craft, now) && <button type="button" className="control-primary onboarding-return" onClick={callHome}>Acquire return signal</button>}{error && <p role="alert" className="text-rose-300">{error}</p>}</main>;
 
-  return <main className="first-probe-onboarding"><div className="onboarding-hangar-light" /><section className="onboarding-probe"><ProbeVisual craft={shownProbe} /></section><section className="onboarding-copy">
+  const reaction = personality === "anxious" || personality === "dramatic" || personality === "chaotic" ? personality : null;
+  return <main className="first-probe-onboarding"><div className="onboarding-hangar-light" /><section className="onboarding-probe"><HangarScene3D craft={shownProbe} phase="onboarding" reaction={introStep === "personality" || introStep === "ready" ? reaction : null} fallback={<ProbeVisual craft={shownProbe} />} /></section><section className="onboarding-copy">
     {introStep === "meet" && <><p className="control-kicker">Unregistered signal detected</p><h1>We found this behind a crate in Hangar 3.</h1><p>Its warranty expired before you were born.</p><blockquote>“It says its name is <strong>{name}</strong>.”</blockquote><div className="onboarding-actions"><button type="button" className="control-primary" onClick={() => setIntroStep("personality")}>Keep name</button><button type="button" className="debrief-minor" onClick={() => setIntroStep("name")}>Rename</button></div></>}
     {introStep === "name" && <><p className="control-kicker">Identity plate printer</p><h1>What should we call it?</h1><input aria-label="Probe name" value={name} maxLength={32} autoFocus onChange={(event) => setName(event.target.value)} /><p className="onboarding-aside">It is pretending not to care. Telemetry suggests otherwise.</p><button type="button" className="control-primary" disabled={!name.trim()} onClick={() => setIntroStep("personality")}>Stamp the plate</button></>}
     {introStep === "personality" && <><p className="control-kicker">Personality calibration</p><h1>One dial appears to control the entire personality.</h1><p>This seems like poor engineering. Choose anyway.</p><PersonalityChoice selected={personality} onSelect={setPersonality} />{personality && <button type="button" className="control-primary" onClick={() => setIntroStep("ready")}>Accept this personality</button>}</>}

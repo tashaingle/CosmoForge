@@ -13,6 +13,9 @@
 # testing
 /coverage
 /.encounter-test-build/
+/.browser-profile/
+/tools/browser-*.png
+*.blend1
 
 # next.js
 /.next/

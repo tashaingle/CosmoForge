@@ -31,6 +31,8 @@ import { CodexPanel } from "@/components/home/CodexPanel";
 import { MemorialPanel } from "@/components/home/MemorialPanel";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { getSkin } from "@/lib/cosmetics";
+import { ProbeVisual } from "@/components/probe/ProbeVisual";
+import { HangarScene3D } from "@/components/three/HangarScene3D";
 import type { PlayerWallet } from "@/lib/economy";
 import {
   buildAwayReport,
@@ -144,6 +146,8 @@ export function HangarClient() {
     return <LoadingScreen label="Acquiring fleet signal…" />;
   }
 
+  const hangarCraft = fleet.crafts.find((craft) => craft.status !== "retired" && craft.status !== "lost") ?? null;
+
   return (
     <div className="min-h-[100dvh] bg-slate-950 text-slate-100">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_#0e749028_0%,_transparent_45%),radial-gradient(ellipse_at_bottom_right,_#1e3a8a33_0%,_#020617_55%)]" />
@@ -199,6 +203,8 @@ export function HangarClient() {
             </button>
           )}
         </section>
+
+        {hangarCraft && <section className="hangar-three-preview"><div className="hangar-three-copy"><p className="control-kicker">Probe bay · visual inspection</p><h2>{hangarCraft.name}</h2><p>Scars, repairs and suspiciously permanent choices are shown directly from this probe’s existing save data.</p></div><HangarScene3D craft={hangarCraft} phase="inspect" fallback={<div className="h-72"><ProbeVisual craft={hangarCraft} /></div>} /></section>}
 
         {/* Core loop: voyages, pings, debriefs */}
         <ProbeVoyagePanel />

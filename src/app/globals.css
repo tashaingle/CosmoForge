@@ -100,3 +100,35 @@ body {
 @media (max-width: 540px) { .control-fleet>div { grid-template-columns: 1fr; }.mission-stage { min-height: 520px; padding: 24px 18px; }.control-header nav a { padding-inline: 8px; }.control-wordmark { font-size: 13px; }.control-telemetry { font-size: 9px; } }
 @media (max-width: 600px) { .debrief-reveal { grid-template-columns: 1fr; gap: 10px; }.cargo-grid { grid-template-columns: 1fr; }.reward-strip { align-items: flex-start; flex-direction: column; gap: 5px; } }
 @media (prefers-reduced-motion: reduce) { .probe-floating,.probe-cursed,.launch-shake,.probe-launching,.transmission-scanline { animation: none !important; } }
+
+/* Optional 3D presentation layer. Gameplay and text always remain outside Canvas. */
+.three-stage { position: relative; width: 100%; height: 100%; min-height: 240px; overflow: hidden; }
+.three-stage canvas { display: block; width: 100% !important; height: 100% !important; }
+.three-mission-stage { min-height: 330px; margin: -8px 0; }
+.three-hangar-stage { min-height: 300px; background: radial-gradient(circle at 50% 48%,#155e7540,transparent 62%); }
+.three-find-stage { min-height: 260px; background: radial-gradient(circle,#312e8150,transparent 67%); }
+.three-loading { display: grid; width: 100%; height: 100%; min-height: 220px; place-items: center; color: #67e8f9; font: 700 10px var(--font-geist-mono); letter-spacing: .16em; text-transform: uppercase; }
+.launch-three-window { width: min(900px,92vw); height: min(58vh,520px); }
+.debrief-cargo-stage { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(260px,.8fr) minmax(320px,1.2fr); align-items: center; gap: 24px; }
+.debrief-cargo-stage .cargo-grid { max-height: 48vh; overflow-y: auto; grid-template-columns: 1fr; }
+.cargo-fallback-mark { display: grid; min-height: 220px; place-items: center; color: #a78bfa; font-size: 90px; opacity: .35; }
+.archive-find-viewer { display: grid; grid-template-columns: minmax(240px,1fr) 1fr; align-items: center; gap: 22px; min-height: 300px; border: 1px solid #ffffff15; background: #03071199; }
+.archive-find-viewer>div:last-child { padding: 24px; }
+.archive-find-viewer h3 { margin-top: 8px; color: white; font-size: 25px; font-weight: 850; }
+.archive-find-viewer p:not(.control-kicker) { margin-top: 8px; color: #94a3b8; }
+.archive-find-viewer small { display: block; margin-top: 18px; color: #c4b5fd; text-transform: uppercase; letter-spacing: .12em; }
+.hangar-three-preview { display: grid; min-height: 420px; grid-template-columns: minmax(230px,.55fr) minmax(0,1.45fr); align-items: center; overflow: hidden; border: 1px solid #ffffff15; background: #030711aa; }
+.hangar-three-copy { padding: clamp(22px,4vw,45px); }
+.hangar-three-copy h2 { margin-top: 8px; color: white; font-size: clamp(26px,4vw,44px); font-weight: 900; }
+.hangar-three-copy p:not(.control-kicker) { margin-top: 10px; color: #94a3b8; font-size: 13px; line-height: 1.6; }
+.onboarding-probe>.three-stage { position: absolute; inset: 0; min-height: 100%; }
+
+@media (max-width: 700px) {
+  .three-mission-stage { min-height: 300px; }
+  .launch-three-window { height: 48vh; }
+  .debrief-cargo-stage,.archive-find-viewer,.hangar-three-preview { grid-template-columns: 1fr; }
+  .debrief-cargo-stage .three-find-stage { min-height: 210px; }
+  .archive-find-viewer>div:last-child { padding-top: 0; }
+  .hangar-three-preview { min-height: 560px; }
+  .hangar-three-preview .three-hangar-stage { min-height: 350px; }
+}

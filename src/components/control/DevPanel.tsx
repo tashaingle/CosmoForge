@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Craft } from "@/lib/types";
+import { setThreePreference, type ThreePreference } from "@/components/three/three-quality";
 
 export type DevAction = "advance" | "complete" | "transmission" | "scar" | "rare" | "cursed" | "credits" | "onboarding" | "reset" | "encounter_common" | "encounter_rare" | "encounter_cursed" | "clear_encounters";
 
@@ -29,6 +30,13 @@ export function DevPanel({ selected, onAction, onEncounter }: DevPanelProps) {
       <p className="mt-2 text-xs text-slate-500">Target: {selected?.name ?? "none"}. This panel is removed from production builds.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {actions.map(([id, label]) => <button key={id} type="button" onClick={() => onAction(id)} disabled={!selected && !canRunWithoutProbe(id)}>{label}</button>)}
+      </div>
+      <div className="mt-3 border-t border-amber-400/20 pt-3">
+        <p>3D QUALITY / FALLBACK</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(["auto", "high", "low", "2d"] as ThreePreference[]).map((mode) => <button key={mode} type="button" onClick={() => setThreePreference(mode)}>{mode === "2d" ? "Force 2D fallback" : mode}</button>)}
+        </div>
+        <p className="mt-2 font-normal text-slate-500">Scar, common/rare/cursed find, launch and return buttons above exercise the corresponding 3D states.</p>
       </div>
       <form className="mt-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); if (encounterId.trim()) onEncounter(encounterId.trim()); }}>
         <label className="sr-only" htmlFor="dev-encounter-id">Encounter ID</label>

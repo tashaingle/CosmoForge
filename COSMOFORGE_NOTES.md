@@ -174,3 +174,22 @@ Rarity multipliers are intentionally steep: common `1`, uncommon `0.42`, rare `0
 Multi-part and delayed events are progress-based follow-up pings, not quests. The protected onboarding encounter is in the same catalogue but marked `onboardingOnly`; normal selection rejects it and onboarding crafts. Development Control can force an encounter by rarity or ID, clear histories, and inspect memory/story state. Automated engine coverage is in `tests/encounters.test.ts` and runs with `npm run test:encounters`.
 
 Probe memories are plain values on `Craft.memory`, with helpers and later dialogue references in `src/game/probe-memory.ts`. Encounter resolution updates the original ping, existing relationship number, cargo/scars, and memory in one craft save. The debrief reads the same craft to reveal the decision. Development Control has a “Replay onboarding” action; its temporary probe is kept local and removed after replay, leaving the real fleet/cloud untouched.
+## Optional 3D presentation layer
+
+Runtime GLBs live in `public/models/`; editable Blender sources stay in
+`tools/blender/`. Components in `src/components/three/` own rendering, lazy
+loading, quality and errors. `src/lib/3d-assets.ts` owns the mission, scar and
+loot mappings. The 3D code receives existing game data and does not save or
+duplicate it.
+
+Control uses `MissionScene3D` for the selected probe while fleet thumbnails stay
+SVG. Onboarding and launch use `HangarScene3D`. Debrief uses the Hangar for
+damage inspection and one `Find3D` cargo focus. Archive mounts `Find3D` only for
+a selected discovered object. Hangar adds one inspection preview without
+removing the existing builder.
+
+Every integration point supplies the old `ProbeVisual` or CSS presentation as a
+fallback. WebGL absence, forced 2D, or a caught render/model error leaves the
+game usable. Low quality reduces pixel ratio, shadows, props and atmosphere.
+Reduced-motion uses static demand rendering. See `3D_ASSETS.md` for paths,
+sizes, Blender names and editing instructions.
