@@ -7,7 +7,6 @@ import type { Craft, ProbePing, VoyageDebrief } from "./types";
 import type { MissionProfileId } from "./orbital";
 import { MISSION_PROFILES } from "./orbital";
 import {
-  fillPing,
   getPersonality,
   getScar,
   pickLine,
@@ -26,10 +25,9 @@ import {
   affectionateBondLabel,
   bondLabel,
   isHardMission,
-  relationshipPingFlavor,
 } from "./probe-relationship";
 import { addLastMessage, pickLastLine } from "./probe-memorial";
-import { encounterMessage, getEncounter } from "@/game/encounters";
+import { advanceNormalEncounters, getEncounter, openingText } from "@/game/encounters";
 import { firstEncounterMemoryLine, incrementMemory, memoryFlavour } from "@/game/probe-memory";
 
 /** Real-time mission length until “ready to come home” (play-tuned) */
@@ -69,25 +67,6 @@ export function isReadyToReturn(craft: Craft, now = Date.now()): boolean {
   return voyageProgress(craft, now) >= 1;
 }
 
-const EVENT_SNIPPETS: { tag: string; scar?: ScarId; loot?: LootId; weight: number }[] = [
-  { tag: "a boring but perfect systems check", loot: "noise_sample", weight: 3 },
-  { tag: "an unreasonably pretty Earthrise", loot: "pretty_earthrise", weight: 2 },
-  { tag: "a dust kiss on the starboard panel", loot: "dust_smudge", scar: "rattles", weight: 2 },
-  { tag: "a spectrum so normal it was suspicious", loot: "boring_spectrum", weight: 2 },
-  { tag: "a reading that made the instrument blink twice", loot: "suspicious_reading", weight: 1 },
-  { tag: "a cold spot with opinions", loot: "cold_spot", weight: 1 },
-  { tag: "static that almost said hello", loot: "radio_whisper", weight: 1 },
-  { tag: "a solar hiccup", loot: "storm_souvenir", scar: "scorched", weight: 1 },
-  { tag: "first useful light on the imager", loot: "first_light", weight: 2 },
-  { tag: "an unscheduled feeling", loot: "unscheduled_emotion", scar: "overshares", weight: 1 },
-  { tag: "an unauthorized essay about Venus", loot: "venus_fanfic", scar: "venus_obsessed", weight: 1 },
-  { tag: "a coordinate that refuses to sit still", loot: "map_that_lies", weight: 1 },
-  { tag: "a nothing that felt like company", loot: "friend_shaped_void", scar: "quiet_now", weight: 1 },
-  { tag: "a bolt that should have left", loot: "lucky_bolt", scar: "lucky", weight: 1 },
-  { tag: "eclipse panic (brief)", scar: "afraid_of_dark", loot: "bent_antenna_tip", weight: 1 },
-  { tag: "a thruster with main-character energy", scar: "limps", weight: 1 },
-];
-
 function hashSeed(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -97,32 +76,20 @@ function hashSeed(s: string): number {
   return h >>> 0;
 }
 
-function pickWeighted(
-  seed: number
-): (typeof EVENT_SNIPPETS)[number] {
-  const rand = (seed % 10000) / 10000;
-  const total = EVENT_SNIPPETS.reduce((a, e) => a + e.weight, 0);
-  let t = rand * total;
-  for (const e of EVENT_SNIPPETS) {
-    t -= e.weight;
-    if (t <= 0) return e;
-  }
-  return EVENT_SNIPPETS[0];
-}
-
 function advanceOnboardingVoyage(craft: Craft, now: number): { craft: Craft; newPings: ProbePing[] } {
   const launched = craft.launchedAt ?? now;
   const duration = craftVoyageDurationMs(craft);
   const encounter = getEncounter("first_matching_signal");
   const pings = [...(craft.pings ?? [])];
   const newPings: ProbePing[] = [];
-  if (encounter && now >= launched + duration * encounter.triggerProgress && !pings.some((ping) => ping.encounterId === encounter.id)) {
+  const triggerProgress = encounter?.triggerProgress ?? 0.32;
+  if (encounter && now >= launched + duration * triggerProgress && !pings.some((ping) => ping.encounterId === encounter.id)) {
     const ping: ProbePing = {
       id: `encounter-${encounter.id}`,
       encounterId: encounter.id,
-      atMs: launched + duration * encounter.triggerProgress,
+      atMs: launched + duration * triggerProgress,
       kind: "milestone",
-      text: encounterMessage(encounter, craft.personalityId ?? "chipper"),
+      text: openingText(encounter, craft),
     };
     pings.push(ping);
     newPings.push(ping);
@@ -157,46 +124,14 @@ export function advanceVoyageStory(
   const personalityId: PersonalityId =
     craft.personalityId ?? "chipper";
   const personality = getPersonality(personalityId);
-  const pings = [...(craft.pings ?? [])];
-  const newPings: ProbePing[] = [];
-  const loot = new Set<LootId>(craft.cargoLootIds ?? []);
-  const scars = new Set<ScarId>(craft.scarIds ?? []);
-
   const launched = craft.launchedAt;
   const dur = voyageDurationMs(craft.missionId);
-  // Up to 4 story beats across the voyage
-  const beatCount = 4;
-  for (let i = 0; i < beatCount; i++) {
-    const beatAt = launched + ((i + 1) / (beatCount + 1)) * dur;
-    if (now < beatAt) break;
-    const id = `beat-${i}`;
-    if (pings.some((p) => p.id === id)) continue;
-
-    const seed = hashSeed(craft.id + id);
-    const ev = pickWeighted(seed + i * 17);
-    let line = fillPing(
-      pickLine(personality.pingTemplates, seed),
-      ev.tag
-    );
-    // Scars tint the voice permanently
-    if (scars.has("quiet_now")) line = line.replace(/!+/g, ".");
-    if (scars.has("overshares")) line += " Also I logged twelve other things.";
-    if (scars.has("limps")) line += " (thruster still theatrical.)";
-    const rel = relationshipPingFlavor(craft.relationship);
-    if (rel && i === 0) line = `${line} ${rel}`;
-    const remembered = memoryFlavour(craft);
-    if (remembered && i === 0) line = `${line} ${remembered}`;
-    const ping: ProbePing = {
-      id,
-      atMs: beatAt,
-      text: line,
-      kind: i === beatCount - 1 ? "milestone" : "chat",
-    };
-    pings.push(ping);
-    newPings.push(ping);
-    if (ev.loot) loot.add(ev.loot);
-    if (ev.scar) scars.add(ev.scar);
-  }
+  const encounterResult = advanceNormalEncounters(craft, now, dur);
+  craft = encounterResult.craft;
+  const pings = [...(craft.pings ?? [])];
+  const newPings: ProbePing[] = [...encounterResult.newPings];
+  const loot = new Set<LootId>(craft.cargoLootIds ?? []);
+  const scars = new Set<ScarId>(craft.scarIds ?? []);
 
   // Absurd launches: chance to go silent near end (last message + lost)
   const absurdFailAt = launched + dur * 0.85;

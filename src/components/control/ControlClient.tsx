@@ -14,7 +14,7 @@ import { loadFleet, replaceFleet, upsertCraft } from "@/lib/storage";
 import { tickAllVoyages, returnProbe, voyageDurationMs } from "@/lib/probe-voyage";
 import { quickLaunch, LAUNCH_PRESETS } from "@/lib/quick-launch";
 import { resolveTransmissionChoice } from "@/game/transmissions";
-import type { EncounterChoiceId } from "@/game/encounters";
+import { clearProbeEncounterHistory, clearSaveEncounterHistory, forceEncounter, forceEncounterByRarity } from "@/game/encounters";
 import { getActiveSkyEvents } from "@/lib/sky-events";
 import { loadWallet } from "@/lib/economy";
 import type { Craft, FleetState, ProbePing, VoyageDebrief } from "@/lib/types";
@@ -58,7 +58,7 @@ export function ControlClient() {
     refresh();
   }
 
-  function choose(pingId: string, choiceId: EncounterChoiceId) {
+  function choose(pingId: string, choiceId: string) {
     if (!selected) return;
     resolveTransmissionChoice(selected, pingId, choiceId, syncContext);
     refresh();
@@ -89,11 +89,24 @@ export function ControlClient() {
     if (!selected) return;
     const craft = { ...selected };
     if (action === "advance" || action === "complete") { const duration = voyageDurationMs(craft.missionId); craft.launchedAt = Date.now() - duration * (action === "complete" ? 1.1 : Math.min(.95, ((Date.now() - (craft.launchedAt ?? Date.now())) / duration) + .1)); if (action === "complete") craft.readyToReturn = true; }
-    if (action === "transmission" || action === "weird") { const ping: ProbePing = { id: `dev-${Date.now()}`, atMs: Date.now(), kind: action === "weird" ? "milestone" : "chat", encounterId: action === "weird" ? "first_matching_signal" : undefined, text: action === "weird" ? "We found something. It is shaped like a bad decision." : "Development ping. Reality appears optional." }; craft.pings = [...(craft.pings ?? []), ping]; }
+    if (action === "transmission") { const ping: ProbePing = { id: `dev-${Date.now()}`, atMs: Date.now(), kind: "chat", text: "Development ping. Reality appears optional." }; craft.pings = [...(craft.pings ?? []), ping]; }
+    if (action === "encounter_common") Object.assign(craft, forceEncounterByRarity(craft, "common"));
+    if (action === "encounter_rare") Object.assign(craft, forceEncounterByRarity(craft, "rare"));
+    if (action === "encounter_cursed") Object.assign(craft, forceEncounterByRarity(craft, "cursed"));
+    if (action === "clear_encounters") { Object.assign(craft, clearProbeEncounterHistory(craft)); clearSaveEncounterHistory(); }
     if (action === "scar") craft.scarIds = [...new Set([...(craft.scarIds ?? []), "scorched" as const])];
     if (action === "rare") craft.cargoLootIds = [...new Set([...(craft.cargoLootIds ?? []), "unscheduled_emotion" as const])];
     if (action === "cursed") craft.cargoLootIds = [...new Set([...(craft.cargoLootIds ?? []), "friend_shaped_void" as const])];
     upsertCraft(craft, syncContext); refresh();
+  }
+
+  function triggerEncounter(encounterId: string) {
+    if (!selected) return;
+    const next = forceEncounter(selected, encounterId);
+    if (next === selected) { setError(`No encounter found with ID “${encounterId}”.`); return; }
+    setError(null);
+    upsertCraft(next, syncContext);
+    refresh();
   }
 
   if (!ready || !fleet || now === 0) return <LoadingScreen label="Tuning the fleet frequencies…" />;
@@ -104,7 +117,7 @@ export function ControlClient() {
     <section className="launch-dock"><div><p className="control-kicker">Launch rail 04</p><p className="text-sm text-slate-400">A fresh probe, a modest mission, absolutely no emotional consequences.</p></div><button type="button" onClick={startLaunch}>+ Send another weirdo into space</button></section>
     {error && <p className="mx-auto max-w-7xl px-4 pb-4 text-sm text-rose-300" role="alert">{error}</p>}
     <section className="secondary-docks"><div id="hangar"><p className="control-kicker">Hangar</p><h2>Design, repair and customise</h2><p>Your detailed builder, parts, cosmetics and fleet management remain intact.</p><Link href="/hangar">Enter hangar →</Link></div><div id="archive"><p className="control-kicker">Archive</p><h2>Things we brought home</h2><p>Solar Passport, discoveries, cursed finds, mission history and memorials live away from the flight console.</p><Link href="/archive">Browse archive records →</Link></div></section>
-    <DevPanel selected={selected} onAction={devAction} />
+    <DevPanel selected={selected} onAction={devAction} onEncounter={triggerEncounter} />
     {launch && <LaunchSequence craft={launch.craft} stage={launch.stage} />}
     {debrief && <DebriefModal debrief={debrief} onClose={() => setDebrief(null)} />}
   </main>;

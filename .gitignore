@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/.encounter-test-build/
 
 # next.js
 /.next/

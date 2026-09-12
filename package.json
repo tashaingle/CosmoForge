@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test:encounters": "tsc -p tsconfig.encounter-tests.json && node .encounter-test-build/tests/encounters.test.js"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

@@ -14,9 +14,7 @@ Edit `PERSONALITIES` in `src/lib/probe-personality.ts`. Each entry has a stable 
 
 ## Add a transmission
 
-Ordinary timed transmissions come from `EVENT_SNIPPETS` and the personality templates in `src/lib/probe-voyage.ts`. Add a snippet with a `tag`, optional scar/loot ID and weight. Four deterministic beats are generated per voyage.
-
-Occasional player choices are intentionally small. `src/game/transmissions.ts` turns unresolved `milestone` pings into choices and applies their consequences. Add a choice to `CHOICES`, extend `TransmissionChoice["id"]`, then handle it in `resolveTransmissionChoice()`. The choice result is stored on the original `ProbePing` (`resolvedChoiceId` and `resolutionText`) in `src/lib/types.ts`.
+Add ordinary and interactive transmissions to `NORMAL_ENCOUNTERS` in `src/game/encounters/catalog.ts`. `src/game/encounters/engine.ts` schedules them; `src/game/transmissions.ts` exposes unresolved choices to the existing panel. The choice result stays on the original `ProbePing` (`resolvedChoiceId` and `resolutionText`) in `src/lib/types.ts`.
 
 ## Add a mission
 
@@ -26,11 +24,11 @@ Mission position/orbit math lives in `src/lib/orbital.ts`; real JPL body samples
 
 ## Add a discovery
 
-Add a stable `LootId` and entry to `LOOT_CATALOG` in `src/lib/probe-loot.ts`. Then reference that ID from an event in `src/lib/probe-voyage.ts`. Rarity controls debrief presentation; `creditValue` controls the one-time catalogue payout. If finding it should unlock a preset, edit `src/lib/probe-unlocks.ts`.
+Add a stable `LootId` and entry to `LOOT_CATALOG` in `src/lib/probe-loot.ts`. Then reference that ID from an encounter consequence in `src/game/encounters/catalog.ts`. Rarity controls debrief presentation; `creditValue` controls the one-time catalogue payout. If finding it should unlock a preset, edit `src/lib/probe-unlocks.ts`.
 
 ## Add a scar
 
-Add a stable `ScarId` and entry to `SCARS` in `src/lib/probe-personality.ts`, then award it from an event in `src/lib/probe-voyage.ts`. To make it visible, add a small conditional layer in `src/components/probe/ProbeVisual.tsx`. Scars are stored directly on the craft, so the visual does not need separate state.
+Add a stable `ScarId` and entry to `SCARS` in `src/lib/probe-personality.ts`, then award it from an encounter consequence in `src/game/encounters/catalog.ts`. To make it visible, add a small conditional layer in `src/components/probe/ProbeVisual.tsx`. Scars are stored directly on the craft, so the visual does not need separate state.
 
 ## Change probe visuals
 
@@ -72,13 +70,64 @@ Use **Replay onboarding** to run the first-probe sequence without deleting the r
 
 The screens and 75-second first mission live in `src/components/onboarding/FirstProbeOnboarding.tsx`; the three personality options live in `PersonalityChoice.tsx`. The short duration is selected by `craftVoyageDurationMs()` in `src/lib/probe-voyage.ts` only when `Craft.onboardingMission` is true. Normal mission durations are unchanged.
 
-## Encounters and probe memory
+## How encounters work
 
-Encounter definitions are in `src/game/encounters.ts`. An encounter has an ID, title, trigger progress, personality-specific message, and choices. Each choice declares relationship changes, optional existing loot/scar IDs, personality responses, and memory values. `src/game/transmissions.ts` connects encounter pings to the existing Transmissions panel and persists the result.
+The obvious place to browse and edit encounters is `src/game/encounters/catalog.ts`. The format is defined in `src/game/encounters/types.ts`; selection and consequences live in `src/game/encounters/engine.ts`; `src/game/transmissions.ts` is the small UI adapter. Do not hard-code encounter buttons in React.
 
-To add an encounter, add one `EncounterDefinition` to `ENCOUNTERS`, then arrange for `probe-voyage.ts` to create a `ProbePing` containing its `encounterId` at the desired trigger. Do not hard-code its buttons in a component.
+A minimal flavour transmission looks like this:
 
-Memory is the optional `memory` object on `Craft` in `src/lib/types.ts`. Values are only strings, numbers or booleans. Helpers live in `src/game/probe-memory.ts`. Add a memory consequence to an encounter choice, then add a readable reference in `memoryFlavour()` for later transmissions or `firstEncounterMemoryLine()` for debrief. Keep keys descriptive and stable, such as `first_encounter_choice` or `strange_photos`.
+```ts
+{
+  id: "unexpected_spoon",
+  title: "Unscheduled cutlery",
+  rarity: "common",
+  type: "flavour",
+  repeat: "repeatable",
+  cooldownVoyages: 1,
+  message: { default: "There is a spoon outside." },
+}
+```
+
+A choice adds `choices`. Every choice has a stable `id`, button `label`, probe `response`, and optional `consequence`:
+
+```ts
+choices: [{
+  id: "retrieve",
+  label: "Retrieve spoon",
+  response: { default: "Spoon secured. Soup remains theoretical." },
+  consequence: {
+    relationship: 1,
+    lootId: "lucky_bolt",
+    memory: { space_spoon_found: true },
+    incrementMemory: { bad_ideas_survived: 1 },
+  },
+}]
+```
+
+Use `simple_choice` for a small decision and `risk_choice` when choices trade safety against damage or finds. Consequences can change relationship (including per personality), add one existing loot/scar ID, set plain memory, increment counters, or set story flags. Not every encounter needs a reward.
+
+For a delayed result, put a `delayed` follow-up on its choice. For a multi-part transmission, put `followUps` on the encounter. `afterProgress` is a mission fraction from `0` to `1`:
+
+```ts
+followUps: [{
+  id: "spoon_moved",
+  afterProgress: 0.8,
+  message: { default: "The spoon moved inside the sealed cargo bay." },
+  consequence: { memory: { spoon_moved: true } },
+}]
+```
+
+Personality text is optional: `message: { default: "Unknown object.", anxious: "Unknown object. No thank you." }`. Missing personalities use `default`. `{name}` becomes the probe's name.
+
+Memory is the optional string/number/boolean object at `Craft.memory` in `src/lib/types.ts`. Require a flag with `memoryRequirements: [{ key: "space_spoon_found", equals: true }]`; counters can use `min`, and `absent: true` matches unset/false. Set values with `memory`, increment counters with `incrementMemory`, and add an ordered `memoryVariants` entry to reference them in later dialogue. The first matching variant wins. Keep keys descriptive and stable.
+
+Repeat rules are `repeatable`, `once_per_probe`, and `once_per_save`. Add `cooldownVoyages` or `maxOccurrences` where useful. Per-probe history is `Craft.encounterHistory`; story seeds are strings in `Craft.storyFlags`; once-per-save history is localStorage key `cosmoforge_encounter_history_v1`. Do not rename shipped encounter IDs without a migration.
+
+Rarity uses deliberately steep multipliers in `engine.ts`: common, uncommon, rare, strange and cursed. Optional `weight` adjusts probability within a rarity. Restrict events with `validMissions`, `validLocations`, and `minVoyages`. Selection is deterministic, so reload cannot reroll a flight. The `onboardingOnly` first encounter is never eligible for normal selection.
+
+For a tiny multi-mission story, have one encounter set memory and require it from a later encounter. `repeating_signal` and `prelaunch_name` in `catalog.ts` are working examples. This is intentionally not a quest engine.
+
+In development, open `DEV // CHEAT CONSOLE` on Control. It can trigger random common/rare/cursed events, trigger an exact ID, clear repeat history, and inspect the selected probe's memory, flags and history. Run `npm run test:encounters` after data or engine changes.
 
 ## Before committing an edit
 

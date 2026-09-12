@@ -13,10 +13,18 @@ export interface ProbePing {
   resolutionText?: string;
   /** Links the message to a small data-driven encounter definition. */
   encounterId?: string;
+  /** Follow-up step within a multi-part or delayed encounter. */
+  encounterPart?: string;
+  encounterRarity?: string;
 }
 
 /** Small, durable facts a probe can refer to later. */
 export type ProbeMemory = Record<string, string | number | boolean>;
+
+export interface EncounterHistoryEntry {
+  count: number;
+  lastVoyage: number;
+}
 
 /** Shown when a probe comes home — the real game moment */
 export interface VoyageDebrief {
@@ -113,6 +121,10 @@ export interface Craft {
   memorialPlaque?: string;
   /** Lightweight story facts; see src/game/probe-memory.ts. */
   memory?: ProbeMemory;
+  /** Per-probe repeat protection for the encounter library. */
+  encounterHistory?: Record<string, EncounterHistoryEntry>;
+  /** Tiny multi-mission story switches; deliberately not a quest system. */
+  storyFlags?: string[];
   /** Marks the one short first-session mission without changing normal missions. */
   onboardingMission?: boolean;
 }

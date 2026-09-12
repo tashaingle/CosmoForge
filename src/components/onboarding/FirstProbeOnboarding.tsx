@@ -14,7 +14,6 @@ import { generateProbeName, getPersonality, type PersonalityId } from "@/lib/pro
 import { quickLaunch } from "@/lib/quick-launch";
 import { advanceVoyageStory, isReadyToReturn, returnProbe } from "@/lib/probe-voyage";
 import { resolveTransmissionChoice } from "@/game/transmissions";
-import type { EncounterChoiceId } from "@/game/encounters";
 import { beginOnboarding, completeOnboarding, endDevelopmentReplay, isDevelopmentReplay, loadOnboarding } from "@/lib/onboarding";
 import type { Craft, VoyageDebrief } from "@/lib/types";
 
@@ -83,7 +82,7 @@ export function FirstProbeOnboarding({ onComplete }: { onComplete: () => void })
     setLaunching(true);
   }
 
-  function choose(pingId: string, choiceId: EncounterChoiceId) {
+  function choose(pingId: string, choiceId: string) {
     if (!craft) return;
     const next = resolveTransmissionChoice(craft, pingId, choiceId, devReplay ? undefined : syncContext);
     if (next) setCraft(next);

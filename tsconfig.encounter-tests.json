@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "incremental": false,
+    "isolatedModules": false,
+    "outDir": ".encounter-test-build",
+    "rootDir": "."
+  },
+  "include": [
+    "tests/encounters.test.ts",
+    "src/game/encounters/**/*.ts",
+    "src/lib/types.ts",
+    "src/lib/orbital.ts",
+    "src/lib/bodies.ts",
+    "src/lib/probe-loot.ts",
+    "src/lib/probe-personality.ts"
+  ]
+}

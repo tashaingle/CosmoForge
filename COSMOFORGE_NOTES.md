@@ -1,12 +1,12 @@
 # CosmoForge architecture notes
 
-This document describes the project as it exists before the Mission Control redesign. It is written for someone comfortable with React, TypeScript, HTML, and CSS.
+This document describes the current Control / Hangar / Archive project. It is written for someone comfortable with React, TypeScript, HTML, and CSS.
 
 ## The short version
 
 CosmoForge is a Next.js 16 App Router application using React 19, TypeScript, Tailwind CSS 4, Zustand, Supabase, and React Three Fiber/Three.js. Most of the game is a browser-side React application. The browser's `localStorage` is the primary save; Supabase optionally mirrors fleet and wallet data for signed-in users and supplies public craft/share/marketplace data.
 
-The current home page is one large `HangarClient` dashboard. It assembles many independent panels (voyages, quick launch, fleet status, daily quest, codex, memorials, passport, sky events, shop, marketplace, and account controls), which is why the main experience feels busy and SaaS-like.
+The home page is the focused Control experience. Management remains in Hangar, while collection and history live in Archive.
 
 ## What happens when the app first loads?
 
@@ -54,7 +54,7 @@ There are two related clocks:
 - The visual/orbital simulation in `src/lib/orbital.ts` and `MissionClient` advances the displayed position.
 - The character voyage in `src/lib/probe-voyage.ts` uses real elapsed wall-clock time. Durations are deliberately game-sized (for example, LEO is 3 minutes and lunar is 12 minutes).
 
-`advanceVoyageStory()` creates up to four deterministic story beats based on craft ID and elapsed progress. Beats add personality-written pings and can add cargo/scars. Because the random-looking result is seeded, reopening the app does not reroll the story. At the end it creates a return ping and marks the craft ready. Deliberately bad launches have a deterministic chance to go silent near the end.
+`advanceVoyageStory()` delegates normal mission events to `src/game/encounters/engine.ts`. Short flights receive zero or one encounter, normal flights one, and long flights one or two. Selection is deterministic from probe, voyage and slot, so reopening cannot reroll an encounter. Location, voyage count, memory, rarity and repeat rules filter the library before weighted selection. At the end it creates a return ping and marks the craft ready. Deliberately bad launches retain their deterministic chance to go silent near the end.
 
 Mission objectives in `src/lib/mission-objectives.ts` are a second progression/reward system used on the mission page. Their progress is stored separately in `cosmoforge-objectives-v1`.
 
@@ -163,6 +163,14 @@ The root route now renders `ControlClient`, which owns one fleet snapshot and pa
 
 `src/components/onboarding/CosmoForgeEntry.tsx` decides between onboarding and normal Control after authentication/cloud merging is ready. `src/lib/onboarding.ts` stores `cosmoforge-onboarding-v1`. No flag plus an empty fleet means a genuinely new player; an existing fleet skips onboarding. An `in_progress` record with a craft ID lets an interrupted first mission resume. The flag becomes `complete` only after the first debrief.
 
-`FirstProbeOnboarding.tsx` owns only the focused first-session sequence. The preview probe becomes a real persisted `Craft` through the existing quick-launch/storage path. `onboardingMission` gives that craft a 75-second voyage without changing any normal duration. Its guaranteed encounter is `first_matching_signal` in `src/game/encounters.ts`. Return stays locked until its choice is resolved.
+`FirstProbeOnboarding.tsx` owns only the focused first-session sequence. The preview probe becomes a real persisted `Craft` through the existing quick-launch/storage path. `onboardingMission` gives that craft a 75-second voyage without changing any normal duration. Its guaranteed encounter is `first_matching_signal` in `src/game/encounters/catalog.ts`. Return stays locked until its choice is resolved.
+
+## Encounter system (current)
+
+The 25 normal encounters live in `src/game/encounters/catalog.ts`; their readable format is in `types.ts`. `engine.ts` owns deterministic weighted selection, pacing, requirements, consequences, follow-ups and repeat protection. `src/game/transmissions.ts` is only the adapter between encounter choices and the existing transmission UI. React components do not contain encounter rules.
+
+Rarity multipliers are intentionally steep: common `1`, uncommon `0.42`, rare `0.1`, strange `0.025`, cursed `0.003`, multiplied by optional encounter `weight`. Eligibility is checked first. Per-probe repeat history and story flags are stored on `Craft`; the small once-per-save ledger uses `cosmoforge_encounter_history_v1`. `once_per_probe`, `once_per_save`, `cooldownVoyages`, and `maxOccurrences` prevent repetition. Memory variants are checked in order and then fall back to personality-specific/default text.
+
+Multi-part and delayed events are progress-based follow-up pings, not quests. The protected onboarding encounter is in the same catalogue but marked `onboardingOnly`; normal selection rejects it and onboarding crafts. Development Control can force an encounter by rarity or ID, clear histories, and inspect memory/story state. Automated engine coverage is in `tests/encounters.test.ts` and runs with `npm run test:encounters`.
 
 Probe memories are plain values on `Craft.memory`, with helpers and later dialogue references in `src/game/probe-memory.ts`. Encounter resolution updates the original ping, existing relationship number, cargo/scars, and memory in one craft save. The debrief reads the same craft to reveal the decision. Development Control has a “Replay onboarding” action; its temporary probe is kept local and removed after replay, leaving the real fleet/cloud untouched.
