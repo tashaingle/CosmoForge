@@ -22,6 +22,22 @@ create table if not exists public.crafts (
 alter table public.crafts add column if not exists commander_name text;
 alter table public.crafts add column if not exists skin_id text;
 
+alter table public.crafts drop constraint if exists crafts_status_check;
+alter table public.crafts add constraint crafts_status_check
+  check (status in ('design', 'inflight', 'complete', 'lost', 'retired'));
+
+-- Probe personality, pings, scars, cargo, debrief, memory. Owner-only; not on
+-- public.crafts so the inflight map cannot read a probe's private story.
+create table if not exists public.craft_stories (
+  craft_id text primary key references public.crafts (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  version integer not null default 1,
+  state jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists craft_stories_user_id_idx on public.craft_stories (user_id);
+
 create index if not exists crafts_user_id_idx on public.crafts (user_id);
 create index if not exists crafts_status_idx on public.crafts (status);
 create index if not exists crafts_inflight_idx on public.crafts (status)
@@ -100,6 +116,11 @@ create trigger crafts_set_updated_at
   before update on public.crafts
   for each row execute function public.set_updated_at();
 
+drop trigger if exists craft_stories_set_updated_at on public.craft_stories;
+create trigger craft_stories_set_updated_at
+  before update on public.craft_stories
+  for each row execute function public.set_updated_at();
+
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
   before update on public.profiles
@@ -107,6 +128,7 @@ create trigger profiles_set_updated_at
 
 -- ── RLS ─────────────────────────────────────────────────────────────
 alter table public.crafts enable row level security;
+alter table public.craft_stories enable row level security;
 alter table public.mission_shares enable row level security;
 alter table public.profiles enable row level security;
 
@@ -132,6 +154,27 @@ create policy "Users update own crafts"
 drop policy if exists "Users delete own crafts" on public.crafts;
 create policy "Users delete own crafts"
   on public.crafts for delete
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users select own craft stories" on public.craft_stories;
+create policy "Users select own craft stories"
+  on public.craft_stories for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users insert own craft stories" on public.craft_stories;
+create policy "Users insert own craft stories"
+  on public.craft_stories for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users update own craft stories" on public.craft_stories;
+create policy "Users update own craft stories"
+  on public.craft_stories for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users delete own craft stories" on public.craft_stories;
+create policy "Users delete own craft stories"
+  on public.craft_stories for delete
   using (auth.uid() = user_id);
 
 -- Multiplayer map: anyone can see craft that are in flight
@@ -171,6 +214,7 @@ create policy "Users insert own profile"
   with check (auth.uid() = id);
 
 comment on table public.crafts is 'Player spacecraft designs and flight state';
+comment on table public.craft_stories is 'Owner-only probe personality, pings, scars, cargo and debrief';
 comment on table public.mission_shares is 'Public shareable mission snapshots';
 comment on table public.profiles is 'Commander display names + wallet';
 

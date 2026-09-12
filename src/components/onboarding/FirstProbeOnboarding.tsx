@@ -6,7 +6,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ProbeVisual } from "@/components/probe/ProbeVisual";
 import { HangarScene3D } from "@/components/three/HangarScene3D";
 import { PersonalityChoice } from "./PersonalityChoice";
-import { CinematicLaunch } from "@/components/control/LaunchSequence";
+import { CinematicLaunch, CinematicReturn } from "@/components/control/LaunchSequence";
 import { MissionStage } from "@/components/control/MissionStage";
 import { TransmissionsPanel } from "@/components/control/TransmissionsPanel";
 import { DebriefModal } from "@/components/home/DebriefModal";
@@ -37,6 +37,7 @@ export function FirstProbeOnboarding({ onComplete }: { onComplete: () => void })
   const [launching, setLaunching] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [debrief, setDebrief] = useState<VoyageDebrief | null>(existing?.status === "complete" ? existing.lastDebrief ?? null : null);
+  const [homecoming, setHomecoming] = useState<VoyageDebrief | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [devReplay] = useState(isDevelopmentReplay);
   const craftId = craft?.id;
@@ -94,7 +95,7 @@ export function FirstProbeOnboarding({ onComplete }: { onComplete: () => void })
     const result = returnProbe(craft.id, devReplay ? undefined : syncContext);
     if (!result.ok || !result.craft || !result.debrief) { setError(result.error ?? "Return signal slipped under a cupboard."); return; }
     setCraft(result.craft);
-    setDebrief(result.debrief);
+    setHomecoming(result.debrief);
   }
 
   function finish(destination: "control" | "again" | "view") {
@@ -107,6 +108,7 @@ export function FirstProbeOnboarding({ onComplete }: { onComplete: () => void })
 
   const shownProbe = craft ?? { ...preview, name, personalityId: personality ?? "anxious" };
   if (launching && craft) return <CinematicLaunch craft={craft} onComplete={finishLaunch} />;
+  if (homecoming && craft) return <CinematicReturn craft={craft} onComplete={() => { setDebrief(homecoming); setHomecoming(null); }} />;
   if (debrief && craft) return <DebriefModal debrief={debrief} onClose={() => finish("control")} actions={{ primaryLabel: `Send ${craft.name} out again`, onPrimary: () => finish("again"), viewLabel: `View ${craft.name}`, onView: () => finish("view") }} />;
 
   if (craft?.status === "inflight") return <main className="onboarding-mission"><header><p className="control-kicker">Definitely safe test flight</p><p>One probe. One orbit. One warranty violation.</p></header><div className="onboarding-mission-grid"><MissionStage craft={craft} now={now} onReturn={callHome} /><TransmissionsPanel craft={craft} onChoice={choose} /></div>{isReadyToReturn(craft, now) && <button type="button" className="control-primary onboarding-return" onClick={callHome}>Acquire return signal</button>}{error && <p role="alert" className="text-rose-300">{error}</p>}</main>;

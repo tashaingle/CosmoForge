@@ -6,6 +6,7 @@ import {
   encounterLocation,
   isEncounterEligible,
   openingText,
+  plannedEncounterCount,
   resolveEncounterChoice,
   selectEncounter,
 } from "../src/game/encounters/engine";
@@ -30,14 +31,14 @@ function probe(overrides: Partial<Craft> = {}): Craft {
   };
 }
 
-test("normal library contains 25 unique encounters and excludes onboarding", () => {
-  assert.equal(NORMAL_ENCOUNTERS.length, 25);
-  assert.equal(new Set(NORMAL_ENCOUNTERS.map((encounter) => encounter.id)).size, 25);
+test("normal library contains unique encounters and excludes onboarding", () => {
+  assert.equal(NORMAL_ENCOUNTERS.length, 38);
+  assert.equal(new Set(NORMAL_ENCOUNTERS.map((encounter) => encounter.id)).size, 38);
   assert.equal(NORMAL_ENCOUNTERS.includes(ONBOARDING_ENCOUNTER), false);
   const typeCounts = Object.groupBy(NORMAL_ENCOUNTERS, (encounter) => encounter.type);
   assert.equal(typeCounts.flavour?.length, 8);
-  assert.equal(typeCounts.simple_choice?.length, 7);
-  assert.equal(typeCounts.risk_choice?.length, 4);
+  assert.equal(typeCounts.simple_choice?.length, 16);
+  assert.equal(typeCounts.risk_choice?.length, 8);
   assert.equal(typeCounts.delayed?.length, 3);
   assert.equal(typeCounts.multi_part?.length, 3);
 });
@@ -92,6 +93,7 @@ test("multi-part follow-ups appear once when their progress thresholds pass", ()
   const first = advanceNormalEncounters(root, 1_750_000, 1_800_000).craft;
   assert.ok(first.pings?.some((ping) => ping.encounterPart === "moved"));
   assert.ok(first.pings?.some((ping) => ping.encounterPart === "behind"));
+  assert.ok(first.cargoLootIds?.includes("unknown_object"));
   const second = advanceNormalEncounters(first, 1_750_000, 1_800_000).craft;
   assert.equal(second.pings?.filter((ping) => ping.encounterPart === "moved").length, 1);
 });
@@ -111,4 +113,30 @@ test("a delayed consequence waits for its chosen branch", () => {
 
 test("onboarding mission is excluded from normal encounter selection", () => {
   assert.equal(selectEncounter(probe({ onboardingMission: true }), 0), undefined);
+});
+
+test("every flight gets at least one encounter, and longer flights can get two", () => {
+  assert.equal(plannedEncounterCount(probe({ missionId: "leo", launchedAt: 1, expectedReturnAt: 180_001 })), 1);
+  const long = plannedEncounterCount(probe({ launchedAt: 1, expectedReturnAt: 1_800_001 }));
+  assert.ok(long === 1 || long === 2);
+  const medium = plannedEncounterCount(probe({ missionId: "lunar", launchedAt: 1, expectedReturnAt: 720_001 }));
+  assert.ok(medium === 1 || medium === 2);
+});
+
+test("memory callbacks stay locked until the earlier choice exists", () => {
+  const humming = getEncounter("bolt_humming")!;
+  assert.equal(isEncounterEligible(humming, probe()), false);
+  assert.equal(isEncounterEligible(humming, probe({ memory: { extra_bolt_logged: true }, voyagesCompleted: 1 })), true);
+  const learned = getEncounter("knock_learned")!;
+  assert.equal(isEncounterEligible(learned, probe({ missionId: "lunar", memory: { knocked_back: true }, voyagesCompleted: 1 })), true);
+  const mail = getEncounter("satellite_mail")!;
+  assert.equal(isEncounterEligible(mail, probe({ missionId: "leo", memory: { greeted_old_satellite: true }, voyagesCompleted: 1 })), true);
+});
+
+test("leftover find models are awarded from existing encounters", () => {
+  assert.equal(getEncounter("moon_hardware")?.choices?.find((choice) => choice.id === "catalogue")?.consequence?.lootId, "moon_rock");
+  assert.equal(getEncounter("debris_dibs")?.choices?.find((choice) => choice.id === "scan")?.consequence?.lootId, "unknown_debris");
+  assert.equal(getEncounter("wrong_earth")?.choices?.find((choice) => choice.id === "replay")?.consequence?.lootId, "wrong_earth");
+  assert.equal(getEncounter("wrong_earth")?.choices?.find((choice) => choice.id === "replay")?.delayed?.consequence?.lootId, "future_timestamp");
+  assert.equal(getEncounter("extra_star")?.followUps?.find((part) => part.id === "behind")?.consequence?.lootId, "unknown_object");
 });

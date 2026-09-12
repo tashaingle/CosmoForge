@@ -20,7 +20,12 @@ export type LootId =
   | "lucky_bolt"
   | "storm_souvenir"
   | "first_light"
-  | "friend_shaped_photo";
+  | "friend_shaped_photo"
+  | "moon_rock"
+  | "unknown_debris"
+  | "wrong_earth"
+  | "future_timestamp"
+  | "unknown_object";
 
 export interface LootDef {
   id: LootId;
@@ -143,6 +148,41 @@ export const LOOT_CATALOG: LootDef[] = [
     blurb: "The empty part of the image appears to be posing.",
     rarity: "rare",
     creditValue: 95,
+  },
+  {
+    id: "moon_rock",
+    name: "Moon rock",
+    blurb: "A lunar sample that has already requested its own chair.",
+    rarity: "common",
+    creditValue: 22,
+  },
+  {
+    id: "unknown_debris",
+    name: "Unknown debris",
+    blurb: "Not one connector matches CosmoForge standards. A high bar, somehow.",
+    rarity: "rare",
+    creditValue: 95,
+  },
+  {
+    id: "wrong_earth",
+    name: "Wrong Earth",
+    blurb: "Earth, except the Moon is duplicated and the daylight comes from nowhere useful.",
+    rarity: "cursed",
+    creditValue: 175,
+  },
+  {
+    id: "future_timestamp",
+    name: "Future timestamp",
+    blurb: "The recorder insists tomorrow happened first.",
+    rarity: "cursed",
+    creditValue: 165,
+  },
+  {
+    id: "unknown_object",
+    name: "Unknown object 01",
+    blurb: "No obvious purpose. No matching age. One part keeps turning toward the door.",
+    rarity: "cursed",
+    creditValue: 200,
   },
 ];
 

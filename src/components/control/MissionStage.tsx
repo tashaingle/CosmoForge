@@ -8,7 +8,7 @@ import { ProbeVisual } from "@/components/probe/ProbeVisual";
 import { MissionScene3D } from "@/components/three/MissionScene3D";
 
 export function MissionStage({ craft, now, onReturn }: { craft: Craft | null; now: number; onReturn: () => void }) {
-  if (!craft) return <section className="mission-stage grid place-items-center"><div className="text-center"><p className="control-kicker">No carrier signal</p><h2 className="mt-2 text-3xl font-bold">Send somebody weird into space.</h2></div></section>;
+  if (!craft) return <section className="mission-stage grid place-items-center"><div className="text-center max-w-md"><p className="control-kicker">No carrier signal</p><h2 className="mt-2 text-3xl font-bold">You are Mission Control.</h2><p className="mt-3 text-sm text-slate-400">Launch a probe, answer it on the intercept channel, bring it home, catalogue what it found. Use the launch rail below.</p></div></section>;
   const mission = MISSION_PROFILES.find((item) => item.id === craft.missionId);
   const personality = getPersonality(craft.personalityId ?? "chipper");
   const pct = Math.round(voyageProgress(craft, now) * 100);

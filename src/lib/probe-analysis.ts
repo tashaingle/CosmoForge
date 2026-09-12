@@ -18,6 +18,8 @@ const UPGRADES: Partial<Record<LootId, LootId>> = {
   radio_whisper: "friend_shaped_void",
   storm_souvenir: "unscheduled_emotion",
   suspicious_reading: "map_that_lies",
+  moon_rock: "unknown_debris",
+  unknown_debris: "unknown_object",
 };
 
 const MYSTERY_NOTES = [

@@ -5,7 +5,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { MathUtils } from "three";
 import type { Craft } from "@/lib/types";
-import { MODEL_PATHS } from "@/lib/3d-assets";
+import { HANGAR_CLAMP_NODES, HANGAR_DOOR_NODES, HANGAR_LOW_QUALITY_HIDE, MODEL_PATHS } from "@/lib/3d-assets";
 import type { ThreeQuality } from "./three-quality";
 import { ProbeModel } from "./ProbeModel";
 import { SceneCamera } from "./SceneCamera";
@@ -18,19 +18,21 @@ function Hangar({ phase, stage, quality, reducedMotion }: { phase: HangarPhase; 
   const source = useGLTF(MODEL_PATHS.hangar);
   const scene = useMemo(() => source.scene.clone(true), [source.scene]);
   useEffect(() => {
-    scene.traverse((object) => { object.visible = quality === "high" || !object.name.match(/Coffee|Toolbox|Clipboard|Spare|Crate/); });
+    scene.traverse((object) => { object.visible = quality === "high" || !HANGAR_LOW_QUALITY_HIDE.test(object.name); });
   }, [quality, scene]);
   useFrame((_, delta) => {
-    if (reducedMotion) return;
     const opening = phase === "launch" ? Math.max(0, stage - 1) / 3 : phase === "return" ? Math.max(0, 3 - stage) / 3 : 0;
-    const left = scene.getObjectByName("HangarDoor_Left");
-    const right = scene.getObjectByName("HangarDoor_Right");
-    if (left) left.position.x = MathUtils.damp(left.position.x, -2.3 * opening, 4, delta);
-    if (right) right.position.x = MathUtils.damp(right.position.x, 2.3 * opening, 4, delta);
-    for (const [name, direction] of [["Dock_Clamp_L", -1], ["Dock_Clamp_R", 1]] as const) {
+    const left = scene.getObjectByName(HANGAR_DOOR_NODES[0]);
+    const right = scene.getObjectByName(HANGAR_DOOR_NODES[1]);
+    const leftX = -2.3 * opening;
+    const rightX = 2.3 * opening;
+    if (left) left.position.x = reducedMotion ? leftX : MathUtils.damp(left.position.x, leftX, 4, delta);
+    if (right) right.position.x = reducedMotion ? rightX : MathUtils.damp(right.position.x, rightX, 4, delta);
+    HANGAR_CLAMP_NODES.forEach((name, index) => {
       const clamp = scene.getObjectByName(name);
-      if (clamp) clamp.rotation.y = MathUtils.damp(clamp.rotation.y, opening * direction * 0.8, 5, delta);
-    }
+      const angle = opening * (index === 0 ? -1 : 1) * 0.8;
+      if (clamp) clamp.rotation.y = reducedMotion ? angle : MathUtils.damp(clamp.rotation.y, angle, 5, delta);
+    });
   });
   return <primitive object={scene} scale={0.72} />;
 }

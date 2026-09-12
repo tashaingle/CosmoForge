@@ -6,8 +6,9 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { FleetRail } from "./FleetRail";
 import { MissionStage } from "./MissionStage";
+import { StandingOrders, hasPendingChoice } from "./StandingOrders";
 import { TransmissionsPanel } from "./TransmissionsPanel";
-import { LaunchSequence } from "./LaunchSequence";
+import { CinematicReturn, LaunchSequence } from "./LaunchSequence";
 import { DevPanel, type DevAction } from "./DevPanel";
 import { DebriefModal } from "@/components/home/DebriefModal";
 import { loadFleet, replaceFleet, upsertCraft } from "@/lib/storage";
@@ -28,6 +29,7 @@ export function ControlClient() {
   const [now, setNow] = useState(0);
   const [debrief, setDebrief] = useState<VoyageDebrief | null>(null);
   const [launch, setLaunch] = useState<{ craft: Craft; stage: number } | null>(null);
+  const [homecoming, setHomecoming] = useState<{ craft: Craft; debrief: VoyageDebrief } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -54,8 +56,9 @@ export function ControlClient() {
   function callHome() {
     if (!selected) return;
     const result = returnProbe(selected.id, syncContext);
-    if (result.debrief) setDebrief(result.debrief); else setError(result.error ?? "Signal refused to cooperate.");
+    if (!result.debrief || !result.craft) { setError(result.error ?? "Signal refused to cooperate."); return; }
     refresh();
+    setHomecoming({ craft: result.craft, debrief: result.debrief });
   }
 
   function choose(pingId: string, choiceId: string) {
@@ -113,12 +116,14 @@ export function ControlClient() {
   const event = getActiveSkyEvents()[0];
   return <main className="control-shell">
     <header className="control-header"><Link href="/" className="control-wordmark">COSMOFORGE <span>α</span></Link><nav aria-label="Primary"><Link href="/" className="active">Control</Link><Link href="/hangar">Hangar</Link><Link href="/archive">Archive</Link></nav><div className="control-telemetry"><span>{active.length} ships away</span><span>✦ {wallet.credits}</span><span className={event ? "text-emerald-300" : ""}>{event ? `LIVE SKY · ${event.name}` : "SKY QUIET"}</span></div></header>
-    <div id="control" className="control-grid"><FleetRail crafts={playable} selectedId={selected?.id} now={now} onSelect={selectCraft} /><MissionStage craft={selected} now={now} onReturn={callHome} /><TransmissionsPanel craft={selected} onChoice={choose} /></div>
-    <section className="launch-dock"><div><p className="control-kicker">Launch rail 04</p><p className="text-sm text-slate-400">A fresh probe, a modest mission, absolutely no emotional consequences.</p></div><button type="button" onClick={startLaunch}>+ Send another weirdo into space</button></section>
+    <StandingOrders craft={selected} now={now} />
+    <div id="control" className="control-grid"><FleetRail crafts={playable} selectedId={selected?.id} now={now} onSelect={selectCraft} /><MissionStage craft={selected} now={now} onReturn={callHome} /><TransmissionsPanel craft={selected} awaitingChoice={hasPendingChoice(selected)} onChoice={choose} /></div>
+    <section className="launch-dock"><div><p className="control-kicker">Launch rail 04</p><p className="text-sm text-slate-400">Need a second ship? Launch another. Your job on this screen is still the one in flight.</p></div><button type="button" onClick={startLaunch}>+ Send another weirdo into space</button></section>
     {error && <p className="mx-auto max-w-7xl px-4 pb-4 text-sm text-rose-300" role="alert">{error}</p>}
     <section className="secondary-docks"><div id="hangar"><p className="control-kicker">Hangar</p><h2>Design, repair and customise</h2><p>Your detailed builder, parts, cosmetics and fleet management remain intact.</p><Link href="/hangar">Enter hangar →</Link></div><div id="archive"><p className="control-kicker">Archive</p><h2>Things we brought home</h2><p>Solar Passport, discoveries, cursed finds, mission history and memorials live away from the flight console.</p><Link href="/archive">Browse archive records →</Link></div></section>
     <DevPanel selected={selected} onAction={devAction} onEncounter={triggerEncounter} />
     {launch && <LaunchSequence craft={launch.craft} stage={launch.stage} />}
+    {homecoming && !debrief && <CinematicReturn craft={homecoming.craft} onComplete={() => { setDebrief(homecoming.debrief); setHomecoming(null); }} />}
     {debrief && <DebriefModal debrief={debrief} onClose={() => setDebrief(null)} />}
   </main>;
 }

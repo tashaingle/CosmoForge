@@ -35,7 +35,7 @@ export type DbCraftRow = {
   name: string;
   commander_name: string | null;
   part_ids: string[];
-  status: "design" | "inflight" | "complete";
+  status: "design" | "inflight" | "complete" | "lost" | "retired";
   mission_id: string | null;
   orbit: unknown;
   launched_at: string | null;
@@ -43,6 +43,14 @@ export type DbCraftRow = {
   notes: string | null;
   skin_id: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type DbCraftStoryRow = {
+  craft_id: string;
+  user_id: string;
+  version: number;
+  state: unknown;
   updated_at: string;
 };
 

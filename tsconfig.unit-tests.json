@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "incremental": false,
+    "isolatedModules": false,
+    "outDir": ".unit-test-build",
+    "rootDir": "."
+  },
+  "include": [
+    "tests/craft-sync.test.ts",
+    "tests/standing-orders.test.ts",
+    "src/lib/standing-orders.ts",
+    "src/lib/craft-mapper.ts",
+    "src/lib/supabase.ts",
+    "src/lib/types.ts",
+    "src/lib/orbital.ts",
+    "src/lib/bodies.ts",
+    "src/lib/probe-loot.ts",
+    "src/lib/probe-personality.ts"
+  ]
+}

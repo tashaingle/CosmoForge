@@ -64,6 +64,12 @@ export function computeAgencyTitles(): {
       ok: found("friend_shaped_void"),
     },
     {
+      id: "wrong_planet",
+      title: "Misfiled the homeworld",
+      blurb: "You catalogued an Earth that fails basic Earth checks.",
+      ok: found("wrong_earth"),
+    },
+    {
       id: "venus",
       title: "Accidental Venus literary agent",
       blurb: "Your probes write essays. You enable them.",

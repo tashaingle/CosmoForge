@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:encounters": "tsc -p tsconfig.encounter-tests.json && node .encounter-test-build/tests/encounters.test.js"
+    "test:3d-assets": "node tools/audit-glb-nodes.mjs",
+    "test:encounters": "tsc -p tsconfig.encounter-tests.json && node .encounter-test-build/tests/encounters.test.js",
+    "test:craft-sync": "tsc -p tsconfig.unit-tests.json && node .unit-test-build/tests/craft-sync.test.js && node .unit-test-build/tests/standing-orders.test.js"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

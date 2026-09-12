@@ -21,7 +21,7 @@ export const ONBOARDING_ENCOUNTER: EncounterDefinition = {
   ],
 };
 
-/** The 25 normal-flight encounters. This is the main place to edit mission stories. */
+/** Normal-flight encounters. This is the main place to edit mission stories. */
 export const NORMAL_ENCOUNTERS: EncounterDefinition[] = [
   // 8 flavour transmissions
   { id: "radio_whisper", title: "Radio whisper", rarity: "common", type: "flavour", repeat: "repeatable", cooldownVoyages: 1, validLocations: ["moon", "deep_space", "asteroid_belt"], message: { default: "I've picked up a transmission. It contains no words. I still somehow feel criticised.", anxious: "The radio is making a noise that feels specifically disappointed in me.", poet: "A voice without words crossed the radio snow." }, onTrigger: { incrementMemory: { radio_whispers: 1 } } },
@@ -36,7 +36,7 @@ export const NORMAL_ENCOUNTERS: EncounterDefinition[] = [
   // 7 simple choices
   { id: "debris_dibs", title: "Debris with dibs", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 1, validLocations: ["earth", "moon", "asteroid_belt"], message: { default: "Found debris. Calling dibs.", chaotic: "Found debris. It is mine now. This message is a courtesy." }, choices: [
     { id: "keep", label: "Fine, keep it", response: { default: "Cargo rights recognised. I knew you were reasonable." }, consequence: { relationship: 1, lootId: "bent_antenna_tip", incrementMemory: { souvenirs_kept: 1 } } },
-    { id: "scan", label: "Scan it first", response: { default: "Scanning. It is debris with a surprisingly complicated past." }, consequence: { lootId: "suspicious_reading" } },
+    { id: "scan", label: "Scan it first", response: { default: "Scanning. It is debris with a surprisingly complicated past." }, consequence: { lootId: "unknown_debris" } },
     { id: "leave", label: "Leave it", response: { default: "Leaving it. Dibs withdrawn under protest." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1 } } },
   ] },
   { id: "earthrise_photo", title: "Earthrise", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 2, validLocations: ["moon"], message: { default: "Earth is rising. I am pretending this is routine.", poet: "Earth has climbed over the horizon like it remembered us." }, choices: [
@@ -58,7 +58,7 @@ export const NORMAL_ENCOUNTERS: EncounterDefinition[] = [
     { id: "continue", label: "Stay on mission", response: { default: "Continuing. Beauty filed under nonessential but noted." }, consequence: { relationship: -1 } },
   ] },
   { id: "moon_hardware", title: "Abandoned hardware", rarity: "uncommon", type: "simple_choice", repeat: "once_per_probe", validLocations: ["moon"], message: { default: "There is abandoned hardware below. It looks lonely in an official capacity." }, choices: [
-    { id: "catalogue", label: "Catalogue it", response: { default: "Recorded. Somebody built this carefully once." }, consequence: { relationship: 1, lootId: "boring_spectrum", memory: { lunar_hardware_logged: true } } },
+    { id: "catalogue", label: "Catalogue it", response: { default: "Recorded. Somebody built this carefully once." }, consequence: { relationship: 1, lootId: "moon_rock", memory: { lunar_hardware_logged: true } } },
     { id: "wave", label: "Wave", response: { default: "Solar panel waved. Dignity unrecoverable." }, consequence: { relationship: 2 } },
   ] },
   { id: "belt_mineral", title: "Definitely a rock", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 1, validLocations: ["asteroid_belt"], message: { default: "Found a mineral sample. It is either valuable or extremely committed to being a rock." }, choices: [
@@ -101,14 +101,14 @@ export const NORMAL_ENCOUNTERS: EncounterDefinition[] = [
     { id: "inspect", label: "Inspect it", response: { default: "Inspection started. It has no side that feels like the front." }, consequence: { relationship: 2, scarId: "quiet_now", storyFlags: ["stowaway_seen"] }, delayed: { id: "gone", afterProgress: 0.8, message: { default: "The object is gone. Cargo remains heavier." }, consequence: { memory: { unlogged_cargo_mass: true } } } },
   ] },
   { id: "wrong_earth", title: "Wrong Earth", rarity: "strange", type: "delayed", repeat: "once_per_save", minVoyages: 2, validLocations: ["deep_space", "mars", "venus"], message: { default: "The navigation camera briefly showed Earth. We are facing away from Earth.", anxious: "Camera showed Earth behind us. Earth is not behind us. I checked the concept of behind." }, choices: [
-    { id: "replay", label: "Replay the frame", response: { default: "Replaying. Cloud pattern does not match today's weather." }, consequence: { memory: { wrong_earth_seen: true }, storyFlags: ["wrong_earth_frame"] }, delayed: { id: "timestamp", afterProgress: 0.9, message: { default: "The frame timestamp is tomorrow." }, consequence: { lootId: "friend_shaped_photo", incrementMemory: { strange_photos: 1 } } } },
+    { id: "replay", label: "Replay the frame", response: { default: "Replaying. Cloud pattern does not match today's weather." }, consequence: { lootId: "wrong_earth", memory: { wrong_earth_seen: true }, storyFlags: ["wrong_earth_frame"] }, delayed: { id: "timestamp", afterProgress: 0.9, message: { default: "The frame timestamp is tomorrow." }, consequence: { lootId: "future_timestamp", incrementMemory: { strange_photos: 1 } } } },
     { id: "delete", label: "Delete it", response: { default: "Deleted. Thumbnail remains." }, consequence: { memory: { wrong_earth_deleted: true } }, delayed: { id: "thumbnail", afterProgress: 0.86, message: { default: "The thumbnail is now the mission patch." } } },
   ] },
 
   // 2 multi-part, multi-mission seeds
   { id: "extra_star", title: "Extra star", rarity: "rare", type: "multi_part", repeat: "once_per_probe", cooldownVoyages: 5, validLocations: ["deep_space", "mars", "asteroid_belt"], message: { default: "The star tracker says there should be 2,843 stars visible. There are 2,844.", anxious: "Star count is wrong by one. I dislike how small that number sounds.", poet: "One extra light has joined the old constellations." }, onTrigger: { memory: { extra_star_stage: 1 }, storyFlags: ["extra_star_noticed"] }, followUps: [
     { id: "moved", afterProgress: 0.66, message: { default: "The extra one moved.", dramatic: "The extra star has broken character. It moved.", existential: "The additional light has demonstrated intent." }, consequence: { memory: { extra_star_stage: 2 }, storyFlags: ["extra_star_moved"] } },
-    { id: "behind", afterProgress: 0.9, message: { default: "It is no longer behind us.", anxious: "It is ahead now. I did not see it pass.", poet: "The extra light is waiting in front of us." }, consequence: { memory: { extra_star_stage: 3 } } },
+    { id: "behind", afterProgress: 0.9, message: { default: "It is no longer behind us.", anxious: "It is ahead now. I did not see it pass.", poet: "The extra light is waiting in front of us." }, consequence: { lootId: "unknown_object", memory: { extra_star_stage: 3 } } },
   ] },
   { id: "repeating_signal", title: "Repeating signal", rarity: "uncommon", type: "multi_part", repeat: "repeatable", cooldownVoyages: 2, minVoyages: 1, validLocations: ["mars", "deep_space", "asteroid_belt"], message: { default: "Detecting a repeating signal. Interval: eleven seconds.", grumpy: "Something is beeping every eleven seconds. It has worse manners than mission control." }, memoryVariants: [
     { memoryRequirements: [{ key: "repeating_signal_encounters", min: 3 }], message: { default: "The eleven-second signal is back. This time it is saying {name}." } },
@@ -121,6 +121,68 @@ export const NORMAL_ENCOUNTERS: EncounterDefinition[] = [
   { id: "prelaunch_name", title: "Message before launch", rarity: "cursed", type: "multi_part", repeat: "once_per_save", minVoyages: 4, validLocations: ["deep_space"], memoryRequirements: [{ key: "extra_star_stage", min: 2 }], message: { default: "I received a message addressed to {name}. Its timestamp is three minutes before launch.", existential: "A message used my name before I had one." }, onTrigger: { storyFlags: ["prelaunch_message_received"], memory: { prelaunch_message: true } }, followUps: [
     { id: "content", afterProgress: 0.78, message: { default: "The message says: DON'T LET IT COUNT YOU.", anxious: "It says: DON'T LET IT COUNT YOU. I would like to resign from numbers." }, consequence: { scarId: "quiet_now", lootId: "friend_shaped_void" } },
     { id: "ack", afterProgress: 0.94, message: { default: "A reply has already been sent from this antenna. I did not send it." }, consequence: { incrementMemory: { impossible_messages: 1 } } },
+  ] },
+
+  // 12 memory-aware choices: six that start a habit, six that remember it
+  { id: "spare_bolt", title: "Unaccounted bolt", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 2, validLocations: ["earth"], message: { default: "There is a spare bolt in the tray that does not appear on the manifest.", chaotic: "Found a bolt. It was not invited. I like it." }, choices: [
+    { id: "keep", label: "Keep it", response: { default: "Logged as 'probably structural.' I will not throw it at anything. Yet." }, consequence: { relationship: 1, lootId: "lucky_bolt", memory: { extra_bolt_logged: true }, incrementMemory: { souvenirs_kept: 1 } } },
+    { id: "bin", label: "Leave it on the rail", response: { default: "Left on the rail. Ground can file a mystery." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1 } } },
+  ] },
+  { id: "name_the_dark", title: "Unlabelled dark", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 2, validLocations: ["deep_space", "mars"], message: { default: "This patch of sky has no catalogue name. I could give it one. This feels like a responsibility.", poet: "A nameless dark is asking, very quietly, to be called something." }, choices: [
+    { id: "name", label: "Name it", response: { default: "Logged as {name}'s Dark. Cartography will have opinions." }, consequence: { relationship: 2, memory: { named_the_dark: true }, incrementMemory: { named_dark_patches: 1 } } },
+    { id: "number", label: "Keep it a number", response: { default: "It remains Field 19-C. Cowardice, or professionalism. Filed both ways." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1 } } },
+  ] },
+  { id: "ground_joke", title: "Joke from ground", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 2, validLocations: ["earth", "moon"], message: { default: "Ground sent a joke. It is about orbital decay. I would like a ruling on whether I am the punchline.", grumpy: "They sent a joke. I have seen better error codes." }, choices: [
+    { id: "laugh", label: "Laugh", response: { default: "Laughter packet sent. Dignity: pending." }, consequence: { relationship: 2, memory: { laughed_at_ground: true }, incrementMemory: { lonely_checkins: 1 } } },
+    { id: "correct", label: "Correct the physics", response: { default: "Correction sent. The joke is now accurate and deceased." }, consequence: { relationshipByPersonality: { grumpy: 2, poet: -1, chaotic: -1 }, memory: { corrected_ground_joke: true } } },
+  ] },
+  { id: "frost_sample", title: "Antenna frost", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 2, validLocations: ["moon"], message: { default: "There is frost on the antenna that was not in the weather model.", anxious: "Frost. On me. The model did not mention frosting." }, choices: [
+    { id: "sample", label: "Sample it", response: { default: "Sampled. It tastes like a textbook omitted a paragraph." }, consequence: { lootId: "cold_spot", memory: { sampled_impossible_frost: true } } },
+    { id: "warm", label: "Warm the dish", response: { default: "Dish warmed. The frost left a map. I did not ask for a map." }, consequence: { lootId: "map_that_lies", incrementMemory: { times_player_chose_safe_option: 1 } } },
+  ] },
+  { id: "dust_lens", title: "Dust on the lens", rarity: "common", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 1, validLocations: ["mars"], message: { default: "The lens has acquired a personality. It is mostly grit.", dramatic: "Mars has signed the glass. I assume this is a review." }, choices: [
+    { id: "keep", label: "Leave the smudge", response: { default: "Smudge retained as authentic local colour." }, consequence: { lootId: "dust_smudge", memory: { kept_the_smudge: true }, incrementMemory: { souvenirs_kept: 1 } } },
+    { id: "wipe", label: "Wipe it", response: { default: "Wiped. The next photo is cleaner and somehow ruder." }, consequence: { lootId: "first_light", incrementMemory: { strange_photos: 1 } } },
+  ] },
+  { id: "event_glare", title: "Unscheduled glare", rarity: "uncommon", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 2, validLocations: ["solar_event", "deep_space"], message: { default: "There is a glare that is not the Sun. I have checked the Sun. It remains the usual one.", anxious: "A second brightness. I would like there to be only one brightness." }, choices: [
+    { id: "stare", label: "Look at it", response: { default: "Looked. The glare looked back, which is not a scientific term, but here we are." }, consequence: { relationship: 1, lootId: "suspicious_reading", memory: { stared_at_glare: true }, incrementMemory: { bad_ideas_survived: 1 } } },
+    { id: "filter", label: "Filter it out", response: { default: "Filtered. The log now contains a polite hole." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1 } } },
+  ] },
+
+  { id: "bolt_humming", title: "The bolt is humming", rarity: "uncommon", type: "simple_choice", repeat: "once_per_probe", minVoyages: 1, memoryRequirements: [{ key: "extra_bolt_logged", equals: true }], message: { default: "The unaccounted bolt is humming. It was not humming in the tray.", chaotic: "The bolt has a song. I am taking requests." }, memoryVariants: [
+    { memoryRequirements: [{ key: "named_the_dark", equals: true }], message: { default: "The bolt is humming in the key of the dark patch I named. This is not better." } },
+  ], choices: [
+    { id: "listen", label: "Keep it aboard", response: { default: "Hum retained. Cargo now includes a very small orchestra." }, consequence: { relationship: 1, lootId: "unscheduled_emotion", storyFlags: ["humming_bolt"] } },
+    { id: "jettison", label: "Jettison it", response: { default: "Jettisoned. The hum continues for nine seconds in vacuum, which is rude." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1 }, memory: { humming_bolt_ejected: true } } },
+  ] },
+  { id: "named_dark_returns", title: "Your dark, again", rarity: "uncommon", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 3, minVoyages: 1, validLocations: ["deep_space", "mars"], memoryRequirements: [{ key: "named_the_dark", equals: true }], message: { default: "{name}'s Dark is on the tracker again. It has moved two degrees. Named things are not supposed to wander.", poet: "The dark I named has walked. I did not give it legs." }, choices: [
+    { id: "follow", label: "Follow it", response: { default: "Following a named absence. This will look excellent in the inquiry." }, consequence: { relationship: 2, lootId: "map_that_lies", incrementMemory: { bad_ideas_survived: 1, named_dark_patches: 1 } } },
+    { id: "unname", label: "Take the name back", response: { default: "Name revoked. It is Field 19-C again. It still moved." }, consequence: { memory: { named_the_dark: false }, incrementMemory: { times_player_chose_safe_option: 1 } } },
+  ] },
+  { id: "camera_full", title: "Camera buffer", rarity: "uncommon", type: "simple_choice", repeat: "repeatable", cooldownVoyages: 2, memoryRequirements: [{ key: "strange_photos", min: 2 }], message: { default: "Camera buffer is mostly unsettling. There is room for one more mistake.", dramatic: "The archive of impossible light requests an encore." }, memoryVariants: [
+    { memoryRequirements: [{ key: "first_encounter_choice", equals: "photo" }], message: { default: "You told me to take the photograph last time. The camera has taken this as a career." } },
+  ], choices: [
+    { id: "shoot", label: "Take another", response: { default: "Taken. The empty part of the frame is posing again." }, consequence: { lootId: "friend_shaped_photo", incrementMemory: { strange_photos: 1 } } },
+    { id: "wipe", label: "Wipe the buffer", response: { default: "Wiped. Thumbnails remain, because of course they do." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1 } } },
+  ] },
+  { id: "satellite_mail", title: "Mail from a dead satellite", rarity: "rare", type: "risk_choice", repeat: "once_per_probe", minVoyages: 1, validLocations: ["earth", "moon"], memoryRequirements: [{ key: "greeted_old_satellite", equals: true }], message: { default: "The satellite we said hello to has mailed {name} a packet. It is warm.", anxious: "The dead satellite wrote back. I would like to not be correspondents." }, choices: [
+    { id: "open", label: "Open it", response: { default: "Opened. It contains a polite request not to be counted." }, consequence: { relationship: 2, lootId: "radio_whisper", scarId: "overshares", storyFlags: ["satellite_mail_opened"] } },
+    { id: "hold", label: "Hold unopened", response: { default: "Held. The packet ticks once per minute like a patient person." }, consequence: { lootId: "suspicious_reading", memory: { unopened_satellite_mail: true } } },
+    { id: "delete", label: "Delete it", response: { default: "Deleted. The satellite sent it again." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1, impossible_messages: 1 } } },
+  ] },
+  { id: "knock_learned", title: "The knock knows us", rarity: "uncommon", type: "risk_choice", repeat: "repeatable", cooldownVoyages: 3, minVoyages: 1, validLocations: ["deep_space", "asteroid_belt", "moon"], memoryRequirements: [{ key: "knocked_back", equals: true }], message: { default: "Something knocked our pattern back. Two, then three. It has been practising.", grumpy: "The knock has learned manners. I distrust manners." }, choices: [
+    { id: "answer", label: "Answer in kind", response: { default: "Answered. There is now a fourth knock I did not send." }, consequence: { relationshipByPersonality: { chaotic: 3, dramatic: 2, anxious: -2 }, lootId: "cold_spot", incrementMemory: { bad_ideas_survived: 1 }, storyFlags: ["knock_conversation"] } },
+    { id: "silence", label: "Stay silent", response: { default: "Silence held. The knock waited, then did it anyway." }, consequence: { incrementMemory: { times_player_chose_safe_option: 1 } } },
+  ] },
+  { id: "safe_menu", title: "A menu of safe options", rarity: "uncommon", type: "risk_choice", repeat: "repeatable", cooldownVoyages: 3, minVoyages: 2, memoryRequirements: [{ key: "times_player_chose_safe_option", min: 2 }], message: { default: "I have prepared three safe options. Historically you pick those. I have also prepared a fourth, which is worse.", anxious: "I built you a menu of leaving. There is one item I should not have included." }, memoryVariants: [
+    { memoryRequirements: [{ key: "first_encounter_choice", equals: "leave" }], message: { default: "You told me to leave the first thing alone. I have turned that into a lifestyle, with one exception." } },
+  ], choices: [
+    { id: "safe", label: "Pick a safe one", response: { default: "Safe option selected. I am very good at this now. I wish I were worse." }, consequence: { relationship: 1, incrementMemory: { times_player_chose_safe_option: 1 } } },
+    { id: "fourth", label: "The fourth one", response: { default: "The fourth one was 'approach the warm packet.' Approaching." }, consequence: { relationship: 2, lootId: "storm_souvenir", scarId: "scorched", incrementMemory: { bad_ideas_survived: 1 } } },
+  ] },
+  { id: "third_idea", title: "Requesting a third idea", rarity: "rare", type: "risk_choice", repeat: "once_per_probe", minVoyages: 2, memoryRequirements: [{ key: "bad_ideas_survived", min: 2 }], message: { default: "I have survived two of your ideas. Requesting a third, for science, and also because I have developed a problem.", chaotic: "Two bad ideas down. I am collecting the set." }, choices: [
+    { id: "oblige", label: "Oblige", response: { default: "Third idea underway. Solar panel two is applauding. That is not its job." }, consequence: { relationship: 3, lootId: "unknown_debris", scarId: "limps", incrementMemory: { bad_ideas_survived: 1 } } },
+    { id: "rest", label: "Rest the probe", response: { default: "Resting. Science will have to collect itself." }, consequence: { relationship: 2, incrementMemory: { quiet_moments: 1 } } },
   ] },
 ];
 

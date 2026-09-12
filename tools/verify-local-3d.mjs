@@ -13,6 +13,7 @@ await new Promise((resolve, reject) => {
 let nextId = 0;
 const pending = new Map();
 const pageErrors = [];
+const failedModel = process.env.COSMOFORGE_FAIL_MODEL;
 socket.addEventListener("message", (event) => {
   const message = JSON.parse(event.data);
   if (message.id && pending.has(message.id)) {
@@ -25,6 +26,9 @@ socket.addEventListener("message", (event) => {
   if (message.method === "Runtime.consoleAPICalled" && message.params.type === "error") {
     pageErrors.push(message.params.args.map((arg) => arg.value ?? arg.description).join(" "));
   }
+  if (message.method === "Fetch.requestPaused") {
+    socket.send(JSON.stringify({ id: ++nextId, method: "Fetch.failRequest", params: { requestId: message.params.requestId, errorReason: "Failed" } }));
+  }
 });
 
 function command(method, params = {}) {
@@ -35,9 +39,14 @@ function command(method, params = {}) {
 
 await command("Runtime.enable");
 await command("Page.enable");
+if (failedModel) await command("Fetch.enable", { patterns: [{ urlPattern: `*${failedModel}*`, requestStage: "Request" }] });
 const mobile = process.env.COSMOFORGE_VERIFY_MOBILE === "1";
 await command("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1440, height: mobile ? 844 : 1000, deviceScaleFactor: 1, mobile });
 await command("Page.navigate", { url: appUrl });
+if (process.env.COSMOFORGE_CLEAR_SAVE === "1") {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await command("Runtime.evaluate", { expression: `localStorage.clear(); sessionStorage.clear(); location.reload()` });
+}
 if (process.env.COSMOFORGE_VERIFY_CONTROL === "1") {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   const now = Date.now();
@@ -45,7 +54,8 @@ if (process.env.COSMOFORGE_VERIFY_CONTROL === "1") {
     id: "browser-verify-probe", name: "Mildred", partIds: [], createdAt: now - 120000,
     updatedAt: now, status: "inflight", missionId: "mars_transfer", launchedAt: now - 45000,
     lastSimMs: now, expectedReturnAt: now + 45000, personalityId: "dramatic", relationship: 8,
-    voyagesCompleted: 7, scarIds: ["scorched", "afraid_of_dark"], cargoLootIds: [], pings: [],
+    voyagesCompleted: 7, scarIds: ["scorched", "afraid_of_dark"], cargoLootIds: process.env.COSMOFORGE_VERIFY_CARGO === "1" ? ["friend_shaped_void"] : [], pings: [],
+    readyToReturn: process.env.COSMOFORGE_VERIFY_RETURN === "1",
   };
   const seed = JSON.stringify({ version: 1, crafts: [craft], selectedCraftId: craft.id });
   await command("Runtime.evaluate", { expression: `localStorage.setItem('cosmoforge-onboarding-v1', JSON.stringify({version:1,status:'complete'})); localStorage.setItem('cosmoforge-fleet-v1', ${JSON.stringify(seed)}); location.reload()` });
@@ -58,14 +68,30 @@ if (process.env.COSMOFORGE_FORCE_3D === "1") {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   await command("Runtime.evaluate", { expression: `localStorage.setItem('cosmoforge-3d-settings-v1', JSON.stringify({preference:'high'})); location.reload()` });
 }
-await new Promise((resolve) => setTimeout(resolve, 9000));
+if (process.env.COSMOFORGE_SEED_COLLECTION === "1") {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await command("Runtime.evaluate", { expression: `localStorage.setItem('cosmoforge-collection-v1', JSON.stringify({version:1,found:{lucky_bolt:1,friend_shaped_void:1,unscheduled_emotion:1,radio_whisper:1,unknown_object:1,future_timestamp:1},totalCreditsFromLoot:790,claimedDebriefs:[]})); location.reload()` });
+}
+if (process.env.COSMOFORGE_CLICK_TEXT) {
+  await new Promise((resolve) => setTimeout(resolve, 3500));
+  await command("Runtime.evaluate", { expression: `((buttons, label) => { const needle = label.toLowerCase(); return (buttons.find(button => button.innerText.trim().toLowerCase() === needle) ?? buttons.find(button => button.innerText.toLowerCase().includes(needle)))?.click(); })([...document.querySelectorAll('button')], ${JSON.stringify(process.env.COSMOFORGE_CLICK_TEXT)})` });
+}
+if (process.env.COSMOFORGE_CLICK_SEQUENCE) {
+  for (const label of process.env.COSMOFORGE_CLICK_SEQUENCE.split("|")) {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await command("Runtime.evaluate", { expression: `((buttons, label) => { const needle = label.toLowerCase(); return (buttons.find(button => button.innerText.trim().toLowerCase() === needle) ?? buttons.find(button => [...button.querySelectorAll('span')].some(span => span.textContent.trim().toLowerCase() === needle)) ?? buttons.find(button => button.innerText.toLowerCase().includes(needle)))?.click(); })([...document.querySelectorAll('button')], ${JSON.stringify(label)})` });
+  }
+}
+await new Promise((resolve) => setTimeout(resolve, Number(process.env.COSMOFORGE_SETTLE_MS ?? 9000)));
 
 const evaluated = await command("Runtime.evaluate", {
   expression: `JSON.stringify({
     title: document.title,
     textLength: document.body.innerText.trim().length,
+    bodyText: document.body.innerText.trim().slice(0, 1600),
     canvasCount: document.querySelectorAll('canvas').length,
     hasErrorOverlay: Boolean(document.querySelector('[data-nextjs-dialog], .vite-error-overlay, #webpack-dev-server-client-overlay')),
+    diagnosticsText: [...document.querySelectorAll('details')].find(node => node.textContent.includes('3D ASSET DIAGNOSTICS'))?.textContent ?? null,
     modelRequests: performance.getEntriesByType('resource').filter(entry => entry.name.includes('/models/')).map(entry => ({ name: entry.name.split('/').pop(), bytes: entry.transferSize }))
   })`,
   returnByValue: true,
@@ -75,6 +101,9 @@ const shot = await command("Page.captureScreenshot", { format: "png", captureBey
 await writeFile("tools/browser-control.png", Buffer.from(shot.data, "base64"));
 
 console.log(JSON.stringify({ ...result, pageErrors }, null, 2));
-const expectedCanvases = process.env.COSMOFORGE_FORCE_2D === "1" ? 0 : 1;
-if (!result.textLength || result.hasErrorOverlay || result.canvasCount !== expectedCanvases || pageErrors.length) process.exitCode = 1;
+const expectedCanvases = process.env.COSMOFORGE_EXPECT_CANVAS != null
+  ? Number(process.env.COSMOFORGE_EXPECT_CANVAS)
+  : process.env.COSMOFORGE_FORCE_2D === "1" ? 0 : 1;
+if (!result.textLength || result.hasErrorOverlay || result.canvasCount !== expectedCanvases || (!failedModel && pageErrors.length)) process.exitCode = 1;
+if (process.env.COSMOFORGE_EXPECT_DIAGNOSTICS === "1" && !result.diagnosticsText?.includes("ALL CLEAR")) process.exitCode = 1;
 socket.close();

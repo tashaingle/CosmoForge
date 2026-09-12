@@ -1,5 +1,5 @@
-import { getSupabaseBrowser, type DbProfileEconomy } from "./supabase";
-import { craftToRow, rowToCraft } from "./craft-mapper";
+import { getSupabaseBrowser, type DbCraftStoryRow, type DbProfileEconomy } from "./supabase";
+import { applyStory, craftToRow, mergeCraft, rowToCraft, storyFromCraft, type CraftStoryState } from "./craft-mapper";
 import type { Craft, LiveCraftMarker } from "./types";
 import type { OrbitElements, MissionProfileId } from "./orbital";
 import type { PlayerWallet } from "./economy";
@@ -16,7 +16,28 @@ export async function fetchCloudFleet(userId: string): Promise<Craft[]> {
     console.warn("[cloud-fleet] fetch", error.message);
     return [];
   }
-  return (data ?? []).map(rowToCraft);
+  const crafts = (data ?? []).map(rowToCraft);
+  const stories = await fetchCraftStories(userId);
+  return crafts.map((craft) => applyStory(craft, stories.get(craft.id)));
+}
+
+async function fetchCraftStories(userId: string): Promise<Map<string, CraftStoryState>> {
+  const sb = getSupabaseBrowser();
+  const stories = new Map<string, CraftStoryState>();
+  if (!sb) return stories;
+  const { data, error } = await sb
+    .from("craft_stories")
+    .select("craft_id, state")
+    .eq("user_id", userId);
+  if (error) {
+    console.warn("[cloud-fleet] stories", error.message);
+    return stories;
+  }
+  for (const row of (data ?? []) as Pick<DbCraftStoryRow, "craft_id" | "state">[]) {
+    const state = row.state as CraftStoryState | null;
+    if (state?.version === 1) stories.set(row.craft_id, state);
+  }
+  return stories;
 }
 
 export async function pushCraftToCloud(
@@ -32,6 +53,17 @@ export async function pushCraftToCloud(
     console.warn("[cloud-fleet] upsert", error.message);
     return { ok: false, error: error.message };
   }
+  const { error: storyError } = await sb.from("craft_stories").upsert(
+    {
+      craft_id: craft.id,
+      user_id: userId,
+      version: 1,
+      state: storyFromCraft(craft),
+      updated_at: new Date(craft.updatedAt || Date.now()).toISOString(),
+    },
+    { onConflict: "craft_id" },
+  );
+  if (storyError) console.warn("[cloud-fleet] story upsert", storyError.message);
   return { ok: true };
 }
 
@@ -45,15 +77,13 @@ export async function deleteCraftFromCloud(
   return { ok: true };
 }
 
-/** Merge local + cloud by id, prefer newer updatedAt */
+/** Merge local + cloud by id, prefer newer updatedAt, keep story fields the newer row omitted. */
 export function mergeFleets(local: Craft[], cloud: Craft[]): Craft[] {
   const map = new Map<string, Craft>();
   for (const c of local) map.set(c.id, c);
   for (const c of cloud) {
     const existing = map.get(c.id);
-    if (!existing || c.updatedAt >= existing.updatedAt) {
-      map.set(c.id, { ...existing, ...c });
-    }
+    map.set(c.id, existing ? mergeCraft(existing, c) : c);
   }
   return Array.from(map.values()).sort((a, b) => b.updatedAt - a.updatedAt);
 }

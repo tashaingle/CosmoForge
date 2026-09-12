@@ -13,6 +13,8 @@
 # testing
 /coverage
 /.encounter-test-build/
+/.unit-test-build/
+/tools/verify-shots/
 /.browser-profile/
 /tools/browser-*.png
 *.blend1

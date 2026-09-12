@@ -56,7 +56,7 @@ Never rename a storage key or persisted ID without writing a migration. Keep new
 
 `src/components/auth/AuthProvider.tsx` detects sessions and merges local/cloud data. `src/lib/cloud-fleet.ts` reads and writes rows; `src/lib/craft-mapper.ts` maps rows to crafts. Local writes happen first, and signed-in writes are then sent to Supabase.
 
-At present cloud craft rows only include core design/flight information. Personality, pings, scars, cargo, relationship, lineage and debrief history are not mapped. Collection, passport, objectives, daily and memorial data are also local-only. Treat Supabase as partial cross-device sync until a versioned game-state column/migration is designed and deployed. Database setup is in `supabase/schema.sql`.
+Signed-in craft sync writes hull fields to `crafts` and probe story (personality, pings, scars, cargo, relationship, lineage, memory, debrief) to owner-only `craft_stories`. Re-run the `craft_stories` section of `supabase/schema.sql` on existing projects. Collection, passport, objectives, daily and memorial data remain local-only. If `craft_stories` is missing, hull sync still works and the browser logs a warning.
 
 ## Development/debug mode
 
@@ -72,7 +72,7 @@ The screens and 75-second first mission live in `src/components/onboarding/First
 
 ## How encounters work
 
-The obvious place to browse and edit encounters is `src/game/encounters/catalog.ts`. The format is defined in `src/game/encounters/types.ts`; selection and consequences live in `src/game/encounters/engine.ts`; `src/game/transmissions.ts` is the small UI adapter. Do not hard-code encounter buttons in React.
+Every normal flight gets at least one encounter (including LEO). Medium and long flights often get a second beat. The obvious place to browse and edit encounters is `src/game/encounters/catalog.ts`. The format is defined in `src/game/encounters/types.ts`; selection and consequences live in `src/game/encounters/engine.ts`; `src/game/transmissions.ts` is the small UI adapter. Do not hard-code encounter buttons in React.
 
 A minimal flavour transmission looks like this:
 

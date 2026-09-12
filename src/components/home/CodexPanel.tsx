@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   LOOT_CATALOG,
   loadCollection,
@@ -10,6 +10,10 @@ import {
 import { computeAgencyTitles } from "@/lib/probe-titles";
 import { Find3D } from "@/components/three/Find3D";
 
+const EMPTY_COLLECTION = { version: 1 as const, found: {} as Record<string, number>, totalCreditsFromLoot: 0, claimedDebriefs: [] as string[] };
+const SERVER_TITLES = { active: { id: "unranked", title: "Unranked mission control", blurb: "Launch something. Become a problem." }, unlocked: [] };
+const subscribeToHydration = () => () => {};
+
 function rarityBucket(r: LootRarity): "science" | "strange" {
   return r === "rare" || r === "cursed" ? "strange" : "science";
 }
@@ -17,8 +21,9 @@ function rarityBucket(r: LootRarity): "science" | "strange" {
 export function CodexPanel() {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<LootId | null>(null);
-  const collection = loadCollection();
-  const titles = computeAgencyTitles();
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
+  const collection = hydrated ? loadCollection() : EMPTY_COLLECTION;
+  const titles = hydrated ? computeAgencyTitles() : SERVER_TITLES;
 
   const science = LOOT_CATALOG.filter((l) => rarityBucket(l.rarity) === "science");
   const strange = LOOT_CATALOG.filter((l) => rarityBucket(l.rarity) === "strange");
@@ -54,7 +59,7 @@ export function CodexPanel() {
           {selectedId && (() => {
             const selected = LOOT_CATALOG.find((item) => item.id === selectedId);
             if (!selected || !(collection.found[selected.id] > 0)) return null;
-            return <div className="archive-find-viewer"><Find3D lootId={selected.id} rarity={selected.rarity} fallback={<div className="cargo-fallback-mark">?</div>} /><div><p className="control-kicker">Archive display stand</p><h3>{selected.name}</h3><p>{selected.blurb}</p><small>Recovered ×{collection.found[selected.id]}</small></div></div>;
+            return <div className="archive-find-viewer"><Find3D lootId={selected.id} rarity={selected.rarity} presentation="archive" fallback={<div className="cargo-fallback-mark">?</div>} /><div><p className="control-kicker">Archive display stand</p><h3>{selected.name}</h3><p>{selected.blurb}</p><small>Recovered ×{collection.found[selected.id]}</small></div></div>;
           })()}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">

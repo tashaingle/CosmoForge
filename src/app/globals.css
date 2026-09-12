@@ -68,6 +68,14 @@ body {
 .control-wordmark { font-weight: 900; letter-spacing: .13em; color: white; }.control-wordmark span { color: #67e8f9; font-size: .7em; }
 .control-header nav { display: flex; gap: 4px; }.control-header nav a { padding: 8px 13px; color: #64748b; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .16em; }.control-header nav a.active { color: #cffafe; border-bottom: 1px solid #67e8f9; }
 .control-telemetry { display: flex; justify-content: flex-end; gap: 16px; font: 600 10px var(--font-geist-mono); text-transform: uppercase; letter-spacing: .12em; color: #94a3b8; }
+.standing-orders { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .85fr); gap: 18px; max-width: 1600px; margin: 0 auto; padding: 16px 24px; border-bottom: 1px solid #ffffff14; background: #07101dbb; }
+.standing-orders h2 { margin-top: 4px; color: #fff; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; }
+.standing-orders p:not(.control-kicker) { margin-top: 6px; color: #94a3b8; font-size: 13px; line-height: 1.45; }
+.standing-orders-meta { font-size: 11px !important; text-transform: uppercase; letter-spacing: .08em; }
+.standing-orders-meta a { color: #67e8f9; }
+.standing-orders-choice { box-shadow: inset 3px 0 0 #c4b5fd; }
+.standing-orders-return { box-shadow: inset 3px 0 0 #67e8f9; }
+.transmissions-awaiting { box-shadow: inset 3px 0 0 #c4b5fd; }
 .control-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(220px, .72fr) minmax(430px, 2fr) minmax(260px, .9fr); min-height: min(720px, calc(100dvh - 150px)); max-width: 1600px; margin: 0 auto; }
 .control-fleet,.transmissions-panel { min-width: 0; padding: 25px 20px; background: #050a12bb; }.control-fleet { border-right: 1px solid #ffffff12; }.transmissions-panel { position: relative; overflow: hidden; border-left: 1px solid #ffffff12; }
 .control-kicker { font: 700 9px var(--font-geist-mono); text-transform: uppercase; letter-spacing: .24em; color: #67e8f9; }
@@ -93,6 +101,7 @@ body {
 
 @media (max-width: 900px) {
   .control-header { grid-template-columns: 1fr auto; padding: 10px 14px; }.control-header nav { order: 3; grid-column: 1 / -1; justify-content: center; }.control-telemetry span:first-child,.control-telemetry span:last-child { display: none; }
+  .standing-orders { grid-template-columns: 1fr; padding: 14px; }
   .control-grid { display: flex; min-height: auto; flex-direction: column; }.mission-stage { order: 1; min-height: 500px; }.transmissions-panel { order: 2; min-height: 260px; border-left: 0; border-top: 1px solid #ffffff12; }.control-fleet { order: 3; border-right: 0; border-top: 1px solid #ffffff12; }.control-fleet>div { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
   .launch-dock { order: 4; flex-direction: column; align-items: stretch; }.secondary-docks { grid-template-columns: 1fr; margin: 24px 14px; }
   .first-probe-onboarding { grid-template-columns: 1fr; }.onboarding-probe { min-height: 340px; max-height: 45dvh; padding-top: 55px; }.onboarding-copy { max-width: none; border-left: 0; border-top: 1px solid #ffffff14; padding: 35px 22px 50px; }.onboarding-mission-grid { grid-template-columns: 1fr; }.onboarding-mission-grid .transmissions-panel { min-height: 330px; }

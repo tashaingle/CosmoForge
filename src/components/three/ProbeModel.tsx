@@ -6,8 +6,16 @@ import { useGLTF } from "@react-three/drei";
 import type { Group, Material, Mesh } from "three";
 import { Color } from "three";
 import type { Craft } from "@/lib/types";
-import { MODEL_PATHS, PROBE_ALTERNATE_MODULES, PROBE_DEFAULT_MODULES, SCAR_3D_OBJECTS } from "@/lib/3d-assets";
+import {
+  MODEL_PATHS,
+  PROBE_ALTERNATE_MODULES,
+  PROBE_ALWAYS_HIDDEN,
+  PROBE_DEFAULT_MODULES,
+  PROBE_VOYAGE_WEAR,
+  SCAR_3D_OBJECTS,
+} from "@/lib/3d-assets";
 import { getSkin } from "@/lib/cosmetics";
+import { ThreeSceneFallback } from "./ThreeSceneFallback";
 
 type ProbeModelProps = {
   craft: Craft;
@@ -27,41 +35,55 @@ function visibleFamily(root: Group, name: string, visible: boolean) {
   });
 }
 
-export function ProbeModel({ craft, reducedMotion = false, launching = false, reaction = null }: ProbeModelProps) {
-  const group = useRef<Group>(null);
+function ProbeHull({ craft }: { craft: Craft }) {
   const probeSource = useGLTF(MODEL_PATHS.probe);
-  const damageSource = useGLTF(MODEL_PATHS.damage);
-  const personality = craft.personalityId ?? "chipper";
-  const { probe, damage } = useMemo(() => {
-    const probe = probeSource.scene.clone(true);
-    const damage = damageSource.scene.clone(true);
-    for (const name of PROBE_ALTERNATE_MODULES) visibleFamily(probe, name, false);
-    for (const name of PROBE_DEFAULT_MODULES) visibleFamily(probe, name, true);
-    damage.traverse((child) => { child.visible = false; });
-    damage.visible = true;
-    for (const scar of craft.scarIds ?? []) {
-      for (const objectName of SCAR_3D_OBJECTS[scar] ?? []) visibleTree(damage, objectName, true);
-    }
-    const voyages = craft.voyagesCompleted ?? 0;
-    if (voyages >= 4) visibleTree(damage, "Veteran_MissionSticker_01", true);
-    if (voyages >= 8) visibleTree(damage, "Repair_PatchPlate_Small", true);
-    if (voyages >= 12) visibleTree(damage, "Repair_WeldedSeam", true);
-    if ((craft.scarIds ?? []).includes("afraid_of_dark")) visibleTree(probe, "Antenna_Whip", false);
+  const probe = useMemo(() => {
+    const next = probeSource.scene.clone(true);
+    for (const name of PROBE_ALTERNATE_MODULES) visibleFamily(next, name, false);
+    for (const name of PROBE_DEFAULT_MODULES) visibleFamily(next, name, true);
+    for (const name of PROBE_ALWAYS_HIDDEN) visibleFamily(next, name, false);
+    if ((craft.scarIds ?? []).includes("afraid_of_dark")) visibleTree(next, "Antenna_Whip", false);
 
     const skinColour = new Color(getSkin(craft.skinId).color);
-    probe.traverse((child) => {
+    next.traverse((child) => {
       const mesh = child as Mesh;
       if (!mesh.isMesh || !mesh.material) return;
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       mesh.material = materials.map((original) => {
-        const next = original.clone() as Material & { color?: Color };
-        if (original.name === "CF_Body" && next.color) next.color.lerp(skinColour, 0.7);
-        return next;
+        const cloned = original.clone() as Material & { color?: Color };
+        if (original.name === "CF_Body" && cloned.color) cloned.color.lerp(skinColour, 0.7);
+        return cloned;
       });
       if (mesh.material.length === 1) mesh.material = mesh.material[0];
     });
-    return { probe, damage };
-  }, [craft.scarIds, craft.skinId, craft.voyagesCompleted, damageSource.scene, probeSource.scene]);
+    return next;
+  }, [craft.scarIds, craft.skinId, probeSource.scene]);
+
+  return <primitive object={probe} />;
+}
+
+function DamageOverlay({ craft }: { craft: Craft }) {
+  const damageSource = useGLTF(MODEL_PATHS.damage);
+  const damage = useMemo(() => {
+    const next = damageSource.scene.clone(true);
+    next.traverse((child) => { child.visible = false; });
+    next.visible = true;
+    for (const scar of craft.scarIds ?? []) {
+      for (const objectName of SCAR_3D_OBJECTS[scar] ?? []) visibleTree(next, objectName, true);
+    }
+    const voyages = craft.voyagesCompleted ?? 0;
+    for (const wear of PROBE_VOYAGE_WEAR) {
+      if (voyages >= wear.minVoyages) visibleTree(next, wear.node, true);
+    }
+    return next;
+  }, [craft.scarIds, craft.voyagesCompleted, damageSource.scene]);
+
+  return <primitive object={damage} />;
+}
+
+export function ProbeModel({ craft, reducedMotion = false, launching = false, reaction = null }: ProbeModelProps) {
+  const group = useRef<Group>(null);
+  const personality = craft.personalityId ?? "chipper";
 
   useFrame(({ clock }, delta) => {
     if (!group.current || reducedMotion) return;
@@ -77,10 +99,11 @@ export function ProbeModel({ craft, reducedMotion = false, launching = false, re
   });
 
   return <group ref={group} scale={0.82} rotation={[0.04, -0.22, 0]}>
-    <primitive object={probe} />
-    <primitive object={damage} />
+    <ProbeHull craft={craft} />
+    <ThreeSceneFallback fallback={null}><DamageOverlay craft={craft} /></ThreeSceneFallback>
     {(craft.cargoLootIds ?? []).includes("friend_shaped_void") && <mesh rotation={[Math.PI / 2, 0.2, 0]}><torusGeometry args={[1.7, 0.012, 5, 48]} /><meshBasicMaterial color="#d946ef" transparent opacity={0.3} /></mesh>}
   </group>;
 }
 
 useGLTF.preload(MODEL_PATHS.probe);
+useGLTF.preload(MODEL_PATHS.damage);

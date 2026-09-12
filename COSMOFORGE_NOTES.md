@@ -34,7 +34,7 @@ The home page is the focused Control experience. Management remains in Hangar, w
 
 The canonical runtime model is `Craft` in `src/lib/types.ts`. The complete local fleet is stored under `cosmoforge-fleet-v1` by `src/lib/storage.ts`. A `Craft` contains design parts, mission/orbit timestamps, personality, pings, scars, cargo, relationship history, last debrief, lineage, and memorial-related fields. This is good in one respect: probe history is not duplicated into a separate character record.
 
-When a user is signed in, `upsertCraft()` writes locally immediately and starts an asynchronous Supabase upsert. `src/lib/craft-mapper.ts` converts between the TypeScript object and the `crafts` database row. Important limitation: the current row mapper only syncs core design/flight fields. Personality, pings, scars, cargo, relationship, lineage and debrief history remain local and are lost when a cloud-only row replaces a craft on another device. Cloud sync is therefore only a partial mirror, not a complete game save.
+When a user is signed in, `upsertCraft()` writes locally immediately and starts an asynchronous Supabase upsert. `src/lib/craft-mapper.ts` maps hull fields onto `crafts` and story fields onto `craft_stories`. Merge prefers the newer `updatedAt` and keeps local story fields when the cloud hull has none, so an unsynced story table cannot wipe pings. Collection, passport, objectives, daily and memorial data remain local-only.
 
 `selectedCraftId` exists in `FleetState`, but the old homepage does not use it as a proper shared selection model; most panels reload their own slices of the fleet.
 

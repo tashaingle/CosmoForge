@@ -10,6 +10,7 @@ export {
   forceEncounterByRarity,
   isEncounterEligible,
   openingText,
+  plannedEncounterCount,
   resolveEncounterChoice,
   selectEncounter,
 } from "./engine";

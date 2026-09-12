@@ -221,11 +221,12 @@ function addFollowUps(craft: Craft, now: number, duration: number): { craft: Cra
   return { craft: next, added };
 }
 
-function plannedEncounterCount(craft: Craft): number {
+export function plannedEncounterCount(craft: Craft): number {
   const duration = craft.expectedReturnAt && craft.launchedAt ? craft.expectedReturnAt - craft.launchedAt : 0;
-  if (craft.missionId === "leo") return seededFraction(`${craft.id}:${craft.voyagesCompleted ?? 0}:short-count`) < 0.55 ? 1 : 0;
-  if (duration >= 25 * 60_000) return seededFraction(`${craft.id}:${craft.voyagesCompleted}:long-count`) < 0.45 ? 2 : 1;
-  return 1;
+  if (craft.missionId === "leo") return 1;
+  const roll = seededFraction(`${craft.id}:${craft.voyagesCompleted ?? 0}:count`);
+  if (duration >= 25 * 60_000) return roll < 0.72 ? 2 : 1;
+  return roll < 0.52 ? 2 : 1;
 }
 
 export function advanceNormalEncounters(craft: Craft, now: number, duration: number): { craft: Craft; newPings: ProbePing[] } {

@@ -21,6 +21,8 @@ The full finds, individual damage and individual environment exports exist in
 `tools/blender/`, but the game uses one combined damage/environment file and
 individual finds to avoid loading an entire museum for one suspicious bolt.
 
+Every public find GLB is mapped from an existing `LootId` in `LOOT_3D_MODELS`.
+
 ## Code ownership
 
 - `src/lib/3d-assets.ts`: every model path and scar/mission/loot mapping.
@@ -36,6 +38,8 @@ Canvas implementations use `next/dynamic` with `ssr: false`. Drei caches loaded
 GLBs; each component clones a scene before changing visibility or materials.
 
 ## Probe mapping
+
+The probe GLB also contains simplified `Damage_*` and `Personality_*` meshes used by the Blender preview. Runtime hides those (`PROBE_ALWAYS_HIDDEN`) and applies scars from `cosmoforge_damage_repair_kit.glb` instead.
 
 `SCAR_3D_OBJECTS` maps existing saved scars to Blender nodes:
 
@@ -75,14 +79,22 @@ small scene accents; choices stay in the transmission panel.
 `LOOT_3D_MODELS` maps each existing `LootId` to a file under
 `public/models/finds/`. To add or replace one, copy `Find_Name.glb` there and
 update that one map. Undiscovered Archive rows are disabled and do not mount or
-download models. Debrief shows one focused model while retaining every cargo
-card in text, preventing simultaneous heavy canvases.
+download models. Debrief cargo reveal loads one rarity case (`CargoCase_Common`,
+`CargoCase_Rare`, `CargoCase_Strange`, or `CargoCase_Cursed`) and rotates its
+`*_Lid` around local X. Archive inspection places the same find on
+`Archive_DisplayStand` at `Archive_DisplayStand_Mount`. One canvas per view;
+every cargo card stays in text. Tagged find hooks animate when those models
+are shown: `Find_RadioWhisper_SignalLight` pulses, `Find_UnscheduledEmotion_Contents`
+floats, `Find_UnknownObject_01_MovingLight` slides, and
+`Find_FutureTimestamp_Display` shows tomorrow’s clock. `prefers-reduced-motion`
+leaves them still.
 
 ## Hangar names
 
-Runtime launch animation relies on `HangarDoor_Left`, `HangarDoor_Right`,
-`Dock_Clamp_L` and `Dock_Clamp_R`. The probe remains a separate model positioned
-at the cradle origin; it is never merged into the Hangar.
+Runtime launch and return animation rely on `HangarDoor_Left`, `HangarDoor_Right`,
+`Dock_Clamp_L` and `Dock_Clamp_R`. Launch opens the bay; call-home plays the
+return phase (doors and clamps closing) before debrief. The probe remains a
+separate model positioned at the cradle origin; it is never merged into the Hangar.
 
 ## Quality, motion and fallback
 
@@ -103,6 +115,15 @@ launch and mission controls exercise the main 3D states.
 
 ## Replace and test a GLB
 
+Before replacing anything, `src/data/3d-asset-contracts.json` defines the contract between Blender exports and the React renderers. It lists every shipped GLB and every node name runtime code relies on.
+
+Run `node tools/audit-glb-nodes.mjs` after replacing a model. It reads the GLB binaries directly and regenerates:
+
+- `3D_ASSET_NODE_INVENTORY.json`, containing every exported node plus duplicate and Blender `.001`/`.002` checks.
+- `3D_ASSET_VALIDATION.md`, containing the expected-versus-actual result. The command fails when a file or required node is missing, a node name is duplicated, a Blender `.001`/`.002` suffix is present, or React/Three.js references a node that no public GLB contains.
+
+In development, expand `3D ASSET DIAGNOSTICS` inside `DEV // CHEAT CONSOLE`. It independently loads the files served to the browser, logs every required node, and shows missing nodes. It is not rendered in production.
+
 1. Preserve the object names listed above.
 2. Replace its file under `public/models/`.
 3. Hard-refresh to clear Drei’s in-memory GLTF cache.
@@ -111,4 +132,3 @@ launch and mission controls exercise the main 3D states.
 6. With a production server on port 3200 and Chrome debugging on port 9222, run
    `$env:COSMOFORGE_VERIFY_URL='http://localhost:3200'; node tools/verify-local-3d.mjs`.
    It checks Canvas/model requests/errors and writes `tools/browser-control.png`.
-

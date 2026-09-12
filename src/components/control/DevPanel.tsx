@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
+import dynamic from "next/dynamic";
 import type { Craft } from "@/lib/types";
 import { setThreePreference, type ThreePreference } from "@/components/three/three-quality";
+
+const AssetDiagnostics: ComponentType = process.env.NODE_ENV === "development"
+  ? dynamic(() => import("@/components/three/AssetDiagnostics").then((module) => module.AssetDiagnostics), { ssr: false })
+  : () => null;
 
 export type DevAction = "advance" | "complete" | "transmission" | "scar" | "rare" | "cursed" | "credits" | "onboarding" | "reset" | "encounter_common" | "encounter_rare" | "encounter_cursed" | "clear_encounters";
 
@@ -47,6 +52,7 @@ export function DevPanel({ selected, onAction, onEncounter }: DevPanelProps) {
         <details><summary>Probe memory</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap">{JSON.stringify(selected.memory ?? {}, null, 2)}</pre></details>
         <details><summary>Story / encounter state</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap">{JSON.stringify({ storyFlags: selected.storyFlags ?? [], encounterHistory: selected.encounterHistory ?? {} }, null, 2)}</pre></details>
       </div> : null}
+      <AssetDiagnostics />
     </details>
   );
 }
